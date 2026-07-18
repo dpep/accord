@@ -136,6 +136,23 @@ module Accord
           raise InvalidInput, result unless result.valid?
         end
       end
+
+      # Project this schema into an RBS class declaration, giving typed reader
+      # signatures so `input.salary` is known to editors, Sorbet, and Steep — no
+      # runtime dependency, just generated signatures. Required and defaulted
+      # fields are non-nilable; optional fields are nilable (the valid-shape
+      # contract). Nested schemas are referenced by class name.
+      def rbs(class_name: name)
+        raise ArgumentError, "cannot generate RBS for an anonymous schema — pass class_name:" if class_name.nil?
+
+        signatures = fields.each_value.map do |field|
+          type = field.rbs
+          type = "#{type}?" unless field.required? || field.has_default?
+          "  def #{field.name}: () -> #{type}"
+        end
+
+        ["class #{class_name} < Accord::Schema", *signatures, "end"].join("\n")
+      end
     end
 
     def initialize

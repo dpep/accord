@@ -55,6 +55,11 @@ module Accord
       raise NotImplementedError, "#{self.class} must implement #openapi"
     end
 
+    # The RBS type of the canonical internal value, e.g. "String", "BigDecimal".
+    def rbs
+      raise NotImplementedError, "#{self.class} must implement #rbs"
+    end
+
     # Short symbol name for a type, e.g. Accord::Types::Currency -> :currency.
     def type_name
       self.class.name.split("::").last.gsub(/([a-z])([A-Z])/, '\1_\2').downcase.to_sym

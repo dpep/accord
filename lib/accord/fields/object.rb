@@ -20,6 +20,10 @@ module Accord
       { type: "object" }
     end
 
+    def rbs
+      schema.name || "untyped"
+    end
+
     private
 
     def coerce_present(raw, strict:, path:)

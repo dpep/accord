@@ -21,6 +21,10 @@ module Accord
       schema
     end
 
+    def rbs
+      type.rbs
+    end
+
     private
 
     def coerce_present(raw, strict:, path:)

@@ -67,6 +67,11 @@ module Accord
       raise NotImplementedError, "#{self.class} must implement #openapi"
     end
 
+    # The RBS type this field's reader returns, e.g. "String", "Array[Employee]".
+    def rbs
+      raise NotImplementedError, "#{self.class} must implement #rbs"
+    end
+
     private
 
     # @abstract Coerce a present (non-nil) raw value into a Result.

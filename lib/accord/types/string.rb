@@ -17,6 +17,10 @@ module Accord
         { type: "string" }
       end
 
+      def rbs
+        "String"
+      end
+
       private
 
       def coerce(value, strict:)

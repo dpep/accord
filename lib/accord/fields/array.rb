@@ -20,6 +20,10 @@ module Accord
       { type: "array", items: { type: "object" } }
     end
 
+    def rbs
+      "Array[#{schema.name || "untyped"}]"
+    end
+
     private
 
     def coerce_present(raw, strict:, path:)

@@ -27,6 +27,10 @@ module Accord
         { type: "string", format: "date" }
       end
 
+      def rbs
+        "Date"
+      end
+
       private
 
       def coerce(value, strict:)

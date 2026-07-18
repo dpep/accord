@@ -72,6 +72,10 @@ module Accord
       }
     end
 
+    def rbs
+      "Money"
+    end
+
     private
 
     def coerce_money(input, raw, strict:, path:)

@@ -51,6 +51,10 @@ module Accord
         { type: "string", format: "decimal" }
       end
 
+      def rbs
+        "BigDecimal"
+      end
+
       private
 
       def coerce(value, strict:)

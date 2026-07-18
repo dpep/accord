@@ -16,6 +16,10 @@ module Accord
         { type: "boolean" }
       end
 
+      def rbs
+        "bool"
+      end
+
       private
 
       def coerce(value, strict:)
