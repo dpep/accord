@@ -5,30 +5,25 @@ require "bigdecimal"
 RSpec.describe Accord::Types::Currency do
   subject(:type) { described_class.new }
 
+  it "defaults to scale 2" do
+    expect(type.scale).to eq(2)
+  end
+
   describe "accepted inputs" do
     it "always returns a BigDecimal, never a Float" do
-      expect(type.parse!("10.50")).to be_a(BigDecimal)
+      expect(type.parse!("12.00")).to be_a(BigDecimal)
     end
 
-    it "parses plain numeric strings and integers in either mode" do
-      expect(type.parse!("10")).to eq(BigDecimal("10"))
-      expect(type.parse!("10.50")).to eq(BigDecimal("10.50"))
-      expect(type.parse!(10)).to eq(BigDecimal("10"))
+    it "parses plain numeric strings, integers, and BigDecimals" do
+      expect(type.parse!("12")).to eq(BigDecimal("12"))
+      expect(type.parse!("12.00")).to eq(BigDecimal("12"))
+      expect(type.parse!(12)).to eq(BigDecimal("12"))
+      expect(type.parse!(BigDecimal("12.34"))).to eq(BigDecimal("12.34"))
     end
 
     it "strips currency formatting when permissive" do
-      expect(type.parse("$10.50")).to eq(BigDecimal("10.50"))
-      expect(type.parse("1,000.00")).to eq(BigDecimal("1000.00"))
-    end
-  end
-
-  describe "Float handling" do
-    it "rejects Float in strict mode" do
-      expect { type.parse!(10.5) }.to raise_error(Accord::CoercionError)
-    end
-
-    it "routes Float through its string form when permissive" do
-      expect(type.parse(10.5)).to eq(BigDecimal("10.5"))
+      expect(type.parse("$12.00")).to eq(BigDecimal("12"))
+      expect(type.parse("1,234.56")).to eq(BigDecimal("1234.56"))
     end
   end
 
@@ -37,8 +32,8 @@ RSpec.describe Accord::Types::Currency do
       expect { type.parse!("$abc") }.to raise_error(Accord::CoercionError)
     end
 
-    it "rejects formatted input in strict mode" do
-      expect { type.parse!("$10.50") }.to raise_error(Accord::CoercionError)
+    it "rejects currency formatting in strict mode" do
+      expect { type.parse!("$12.00") }.to raise_error(Accord::CoercionError)
     end
 
     it "returns nil in permissive mode for garbage" do
@@ -46,15 +41,27 @@ RSpec.describe Accord::Types::Currency do
     end
   end
 
+  describe "scale enforcement" do
+    it "raises for more than two decimal places in strict mode" do
+      expect { type.parse!("12.345") }.to raise_error(Accord::CoercionError)
+    end
+
+    it "honors a custom scale" do
+      expect(described_class.new(scale: 4).parse!("12.3456")).to eq(BigDecimal("12.3456"))
+    end
+  end
+
   describe "#dump" do
-    it "emits a plain decimal string" do
-      expect(type.dump(BigDecimal("1000.5"))).to eq("1000.5")
+    it "renders exactly two decimal places" do
+      expect(type.dump(BigDecimal("12"))).to eq("12.00")
+      expect(type.dump(BigDecimal("12.3"))).to eq("12.30")
+      expect(type.dump(BigDecimal("12.34"))).to eq("12.34")
     end
   end
 
   describe "#openapi" do
-    it "describes a number" do
-      expect(type.openapi).to eq(type: "number")
+    it "exposes a decimal string with an example" do
+      expect(type.openapi).to eq(type: "string", format: "decimal", example: "1234.56")
     end
   end
 end

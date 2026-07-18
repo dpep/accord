@@ -119,6 +119,19 @@ RSpec.describe Accord::Schema do
     end
   end
 
+  describe "decimal fields" do
+    let(:schema) do
+      Class.new(described_class) do
+        decimal :rate, scale: 4
+      end
+    end
+
+    it "enforces the declared scale" do
+      expect(schema.parse({ rate: "0.1234" }).rate).to eq(BigDecimal("0.1234"))
+      expect(schema.parse({ rate: "0.12345" })).not_to be_valid
+    end
+  end
+
   describe "parse!" do
     it "returns the typed input when valid" do
       expect(schema.parse!({ name: "Ada" }).name).to eq("Ada")

@@ -9,6 +9,7 @@ require_relative "validation"
 require_relative "types/string"
 require_relative "types/boolean"
 require_relative "types/date"
+require_relative "types/decimal"
 require_relative "types/currency"
 
 module Accord
@@ -58,8 +59,12 @@ module Accord
         field(name, Types::Date.new(formats:), **opts)
       end
 
-      def currency(name, **opts)
-        field(name, Types::Currency.new, **opts)
+      def decimal(name, scale: Types::Decimal::DEFAULT_SCALE, round: false, **opts)
+        field(name, Types::Decimal.new(scale:, round:), **opts)
+      end
+
+      def currency(name, scale: 2, round: false, **opts)
+        field(name, Types::Currency.new(scale:, round:), **opts)
       end
 
       # A nested schema. The parsed value is a sub-schema instance.
