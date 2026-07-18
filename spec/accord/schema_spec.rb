@@ -132,6 +132,18 @@ RSpec.describe Accord::Schema do
     end
   end
 
+  describe "duration fields" do
+    let(:schema) do
+      Class.new(described_class) do
+        duration :work_time, unit: :hours
+      end
+    end
+
+    it "parses a duration into a BigDecimal" do
+      expect(schema.parse({ work_time: "1.5" }).work_time).to eq(BigDecimal("1.5"))
+    end
+  end
+
   describe "parse!" do
     it "returns the typed input when valid" do
       expect(schema.parse!({ name: "Ada" }).name).to eq("Ada")

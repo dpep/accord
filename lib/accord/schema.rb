@@ -11,6 +11,7 @@ require_relative "types/boolean"
 require_relative "types/date"
 require_relative "types/decimal"
 require_relative "types/currency"
+require_relative "types/duration"
 
 module Accord
   # A schema is the source of truth for an API boundary. The class declares the
@@ -65,6 +66,10 @@ module Accord
 
       def currency(name, scale: 2, round: false, **opts)
         field(name, Types::Currency.new(scale:, round:), **opts)
+      end
+
+      def duration(name, unit: :hours, scale: 2, round: false, **opts)
+        field(name, Types::Duration.new(unit:, scale:, round:), **opts)
       end
 
       # A nested schema. The parsed value is a sub-schema instance.
