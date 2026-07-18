@@ -1,0 +1,89 @@
+# Accord
+
+Executable API contracts for Ruby.
+
+A schema is the source of truth for an API boundary. One declaration describes the accepted input, coerces it into typed Ruby objects, validates it, collects structured errors, and (later) documents the contract.
+
+```ruby
+class CreateEmployee < Accord::Schema
+  string :name, required: true
+  boolean :active, default: true
+  currency :salary
+
+  validate(:salary) { |salary| error(:must_be_positive) if salary.negative? }
+end
+
+input = CreateEmployee.parse(params)
+
+if input.valid?
+  EmployeeService.call(input)
+else
+  render json: input.errors.map(&:to_h), status: :unprocessable_entity
+end
+```
+
+Accessors return coerced values directly — no wrappers:
+
+```ruby
+input.name    # => "Ada"
+input.active  # => true
+input.salary  # => #<BigDecimal ...>
+```
+
+## Parsing modes
+
+Two modes, one coercion engine.
+
+**Permissive** (`parse`, the default) — for API migration. Accepts legacy formats, normalizes values, and collects a structured error per bad field instead of raising.
+
+```ruby
+input = CreateEmployee.parse({ salary: "$1,000.00" })
+input.salary            # => 0.1e4 (BigDecimal)
+```
+
+**Strict** (`parse(..., strict: true)`) — for trusted callers. Raises on the first invalid value or missing required field.
+
+```ruby
+Accord::Types::Currency.parse!("$abc")   # => raises Accord::CoercionError
+```
+
+## Field types
+
+Each type implements a common interface: `parse` (permissive), `parse!` (strict), `dump`, and `openapi`.
+
+| Type | Permissive accepts | Strict accepts | Internal |
+|------|--------------------|----------------|----------|
+| `string`   | String, Symbol, Numeric        | String                     | `String` |
+| `boolean`  | `true`/`false`, `"true"`/`"false"`, `"1"`/`"0"`, `"yes"`/`"no"` | `true`/`false` | `true`/`false` |
+| `date`     | Date, Time, ISO-8601, configured legacy `formats:` | Date, Time, ISO-8601 | `Date` |
+| `currency` | `"10"`, `"10.50"`, `"$10.50"`, `"1,000.00"`, Integer, Float | plain numeric strings, Integer | `BigDecimal` |
+
+Currency is always `BigDecimal`, never `Float` — Floats are rejected in strict mode and routed through their string form otherwise, so binary rounding never enters the pipeline.
+
+## Errors
+
+Errors are first-class objects (`Accord::Error`) carrying `field`, `path`, `code`, `message`, `input`, and `value`. Paths are arrays so nested schemas (coming next) can point at `[:employees, 2, :salary]`.
+
+```ruby
+input.errors.first.to_h
+# => { field: :salary, path: [:salary], code: :invalid_currency,
+#      message: "invalid_currency", input: "$abc", value: nil }
+```
+
+## Roadmap
+
+- **Milestone 1 — Core types** ✅ Schema, Field, typed input object, String / Boolean / Date / Currency, Error objects. No Rails dependency.
+- **Milestone 2 — Nested schemas** `object` and `array` fields, nested error paths.
+- **Milestone 3 — Rails integration** controller helpers, `ActiveSupport::Notifications`, params handling.
+- **Milestone 4 — OpenAPI** generate OpenAPI components from a schema.
+
+## Development
+
+```sh
+bundle install
+bundle exec rspec
+```
+
+## License
+
+[MIT](LICENSE.txt)
