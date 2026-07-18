@@ -3,44 +3,57 @@
 require_relative "errors"
 
 module Accord
-  # Rails controller integration. Include in a controller to parse request
-  # params through a schema; invalid input raises Accord::InvalidInput, which is
-  # rendered as a 422 by the rescue_from installed on include.
+  # Rails controller integration. The schema is the entry point — call
+  # `Schema.parse!(params)` directly, or declare an input with the `accord`
+  # macro. Either way, invalid input raises Accord::InvalidInput, rendered as a
+  # 422 by the rescue_from installed on include.
   #
   #   class EmployeesController < ApplicationController
-  #     include Accord::ControllerHelpers
+  #     accord :employee, CreateEmployee
   #
   #     def create
-  #       input = parse_input(CreateEmployee)
-  #       EmployeeService.call(input)
+  #       EmployeeService.call(employee)   # parsed + memoized; 422 if invalid
   #       head :created
   #     end
   #   end
   #
-  # The schema is itself the allowlist — it reads only its declared fields and
-  # ignores everything else — so params are taken unfiltered.
+  # The macro declares a lazily-parsed, memoized reader rather than an action
+  # hook, so a controller can declare several inputs and each action uses
+  # whichever it needs. `from:` scopes the source (defaults to `params`):
+  #
+  #     accord :filters, EmployeeFilters, from: -> { params[:q] }
+  #
+  # The schema is itself the allowlist — it reads only its declared fields via
+  # `[]`/`key?`, which ActionController::Parameters permits without `permit` —
+  # so params are consumed directly, unfiltered.
   module ControllerHelpers
     def self.included(base)
+      base.extend(ClassMethods)
       return unless base.respond_to?(:rescue_from)
 
-      base.rescue_from(Accord::InvalidInput) do |error|
-        render json: { errors: error.errors.map(&:to_h) }, status: :unprocessable_entity
-      end
+      base.rescue_from(Accord::InvalidInput) { |error| render_accord_errors(error) }
     end
 
-    # Parse params through a schema, returning the typed input. Raises
-    # Accord::InvalidInput (→ 422) when the input does not satisfy the schema.
-    def parse_input(schema, source = params)
-      input = schema.parse(accord_param_hash(source))
-      raise Accord::InvalidInput, input unless input.valid?
-
-      input
+    module ClassMethods
+      # Declare a memoized input reader backed by a schema.
+      def accord(name, schema, from: nil)
+        define_method(name) { accord_input(name, schema, from) }
+      end
     end
 
     private
 
-    def accord_param_hash(source)
-      source.respond_to?(:to_unsafe_h) ? source.to_unsafe_h : source
+    # Override in a controller to customize the 422 response.
+    def render_accord_errors(error)
+      render json: { errors: error.errors.map(&:to_h) }, status: :unprocessable_entity
+    end
+
+    def accord_input(name, schema, from)
+      @accord_inputs ||= {}
+      return @accord_inputs[name] if @accord_inputs.key?(name)
+
+      source = from ? instance_exec(&from) : params
+      @accord_inputs[name] = schema.parse!(source)
     end
   end
 end

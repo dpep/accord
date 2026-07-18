@@ -94,10 +94,20 @@ module Accord
 
       # Parse untrusted input into a typed schema instance.
       #
-      # strict: false (default) collects errors and normalizes legacy input.
-      # strict: true raises on the first coercion failure — for trusted callers.
-      def parse(input, strict: false, path: [])
+      # Non-strict (the default, configurable via Accord.config.strict) collects
+      # errors and normalizes legacy input. Strict raises on the first coercion
+      # failure — for trusted callers. A per-call `strict:` overrides the config.
+      def parse(input, strict: Accord.config.strict, path: [])
         new._parse(input || {}, strict:, path:)
+      end
+
+      # Parse and raise Accord::InvalidInput unless the result is valid — the
+      # entry point for callers that want the typed input or a failure, with no
+      # `.valid?` check (e.g. Rails controllers).
+      def parse!(input, **options)
+        parse(input, **options).tap do |result|
+          raise InvalidInput, result unless result.valid?
+        end
       end
     end
 

@@ -20,7 +20,7 @@ Typing ships **before** OpenAPI: it improves every downstream developer experien
 - **M1 — Core types** ✅ Schema, Field, typed input object, String/Boolean/Date/Currency, Error objects. No Rails.
 - **M2 — Nested schemas** ✅ `object`/`array` fields, composed error paths (`[:employees, 2, :salary]`).
 - **M3 — Rails integration** ✅ baseline (`ControllerHelpers`, `ActiveSupport::Notifications`, params handling).
-  - **M3.1 — refinement** (in progress): declarative controller macro, library-level default mode config, overridable error rendering.
+  - **M3.1 — refinement** ✅ `Schema.parse!` entry point, declarative `accord` controller macro (lazy memoized reader, `from:` source scoping), `Accord.configure { |c| c.strict = ... }` default mode, overridable `render_accord_errors`.
 - **M4 — Typing projection** `Schema.rbs` — generate RBS signatures for the parsed result. Field → Ruby type is already known (`string → String`, `currency → BigDecimal`, `boolean → bool`, `object → sub-schema`, `array → T::Array[sub]`).
 - **M5 — OpenAPI** `Schema.openapi` — components with required fields, nested properties, array items, descriptions, examples; later rswag.
 

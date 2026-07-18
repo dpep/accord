@@ -3,10 +3,17 @@
 require "accord/controller_helpers"
 
 RSpec.describe Accord::ControllerHelpers do
+  let(:schema) do
+    Class.new(Accord::Schema) do
+      string :name, required: true
+    end
+  end
+
   # A minimal stand-in for an ActionController that captures rescue_from
-  # registrations and render calls — no Rails required.
-  let(:controller_class) do
-    Class.new do
+  # registrations and render calls — no Rails required. The block customizes
+  # the controller (declaring inputs, overriding rendering).
+  def build_controller(&body)
+    klass = Class.new do
       class << self
         def rescue_handlers
           @rescue_handlers ||= {}
@@ -19,10 +26,14 @@ RSpec.describe Accord::ControllerHelpers do
 
       include Accord::ControllerHelpers
 
-      attr_reader :params, :rendered
+      attr_reader :rendered
 
-      def initialize(params)
+      def initialize(params = {})
         @params = params
+      end
+
+      def params
+        @params
       end
 
       def render(**args)
@@ -31,8 +42,8 @@ RSpec.describe Accord::ControllerHelpers do
 
       # Mimic Rails dispatch: run the action, routing raised exceptions through
       # the registered rescue_from handlers.
-      def dispatch(schema)
-        parse_input(schema)
+      def dispatch(&action)
+        instance_exec(&action)
       rescue StandardError => e
         handler = self.class.rescue_handlers.find { |klass, _| e.is_a?(klass) }&.last
         raise unless handler
@@ -40,44 +51,61 @@ RSpec.describe Accord::ControllerHelpers do
         instance_exec(e, &handler)
       end
     end
-  end
 
-  let(:schema) do
-    Class.new(Accord::Schema) do
-      string :name, required: true
-    end
+    klass.class_eval(&body) if body
+    klass
   end
 
   it "installs a rescue_from for InvalidInput on include" do
-    expect(controller_class.rescue_handlers).to have_key(Accord::InvalidInput)
+    expect(build_controller.rescue_handlers).to have_key(Accord::InvalidInput)
   end
 
-  it "returns the typed input for valid params" do
-    controller = controller_class.new({ name: "Ada" })
-    expect(controller.parse_input(schema).name).to eq("Ada")
-  end
+  describe "the accord macro" do
+    it "exposes a typed, memoized reader" do
+      input = schema
+      controller = build_controller { accord :employee, input }.new({ name: "Ada" })
 
-  it "raises InvalidInput carrying the errors for invalid params" do
-    controller = controller_class.new({})
+      expect(controller.employee.name).to eq("Ada")
+      expect(controller.employee).to be(controller.employee)
+    end
 
-    expect { controller.parse_input(schema) }.to raise_error(Accord::InvalidInput) do |error|
-      expect(error.errors.map(&:code)).to eq([:required])
+    it "scopes the source with from:" do
+      input = schema
+      controller_class = build_controller do
+        accord :employee, input, from: -> { params[:employee] }
+      end
+      controller = controller_class.new({ employee: { name: "Ada" } })
+
+      expect(controller.employee.name).to eq("Ada")
+    end
+
+    it "raises InvalidInput, rendered as a 422, for invalid params" do
+      input = schema
+      controller = build_controller { accord :employee, input }.new({})
+      controller.dispatch { employee }
+
+      expect(controller.rendered[:status]).to eq(:unprocessable_entity)
+      expect(controller.rendered[:json][:errors].first[:code]).to eq(:required)
     end
   end
 
-  it "renders a 422 with structured errors through the rescue handler" do
-    controller = controller_class.new({})
-    controller.dispatch(schema)
+  describe "render_accord_errors" do
+    it "is overridable to customize the response" do
+      input = schema
+      controller_class = build_controller do
+        accord :employee, input
 
-    expect(controller.rendered[:status]).to eq(:unprocessable_entity)
-    expect(controller.rendered[:json][:errors].first[:code]).to eq(:required)
-  end
+        private
 
-  it "reads unfiltered params from ActionController::Parameters-like objects" do
-    params = Object.new
-    def params.to_unsafe_h = { name: "Ada" }
+        def render_accord_errors(error)
+          render json: { count: error.errors.size }, status: :bad_request
+        end
+      end
+      controller = controller_class.new({})
+      controller.dispatch { employee }
 
-    controller = controller_class.new(params)
-    expect(controller.parse_input(schema).name).to eq("Ada")
+      expect(controller.rendered[:status]).to eq(:bad_request)
+      expect(controller.rendered[:json][:count]).to eq(1)
+    end
   end
 end

@@ -2,6 +2,7 @@
 
 require_relative "accord/version"
 require_relative "accord/errors"
+require_relative "accord/configuration"
 require_relative "accord/type"
 require_relative "accord/types/string"
 require_relative "accord/types/boolean"
@@ -21,6 +22,15 @@ require_relative "accord/schema"
 # structured errors, and documents the contract.
 module Accord
   class << self
+    # Library configuration (e.g. the default parse mode). See Configuration.
+    def config
+      @config ||= Configuration.new
+    end
+
+    def configure
+      yield config
+    end
+
     # Optional logger used by permissive standalone type coercion to record
     # dropped values.
     attr_accessor :logger

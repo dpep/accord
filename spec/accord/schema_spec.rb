@@ -119,6 +119,18 @@ RSpec.describe Accord::Schema do
     end
   end
 
+  describe "parse!" do
+    it "returns the typed input when valid" do
+      expect(schema.parse!({ name: "Ada" }).name).to eq("Ada")
+    end
+
+    it "raises InvalidInput carrying the errors when invalid" do
+      expect { schema.parse!({}) }.to raise_error(Accord::InvalidInput) do |error|
+        expect(error.errors.map(&:code)).to include(:required)
+      end
+    end
+  end
+
   describe "inheritance" do
     it "extends a parent schema without mutating it" do
       child = Class.new(schema) { string :department }

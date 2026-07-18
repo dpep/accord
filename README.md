@@ -108,19 +108,48 @@ Opt-in and decoupled — the core gem carries no Rails or ActiveSupport dependen
 gem "accord", require: "accord/rails"
 ```
 
-This wires permissive-parse events to `ActiveSupport::Notifications` and makes `parse_input` available in controllers:
+This wires permissive-parse events to `ActiveSupport::Notifications` and makes the `accord` macro available in controllers:
 
 ```ruby
 class EmployeesController < ApplicationController
+  accord :employee, CreateEmployee
+
   def create
-    input = parse_input(CreateEmployee)   # 422 with structured errors if invalid
-    EmployeeService.call(input)
+    EmployeeService.call(employee)   # parsed + memoized on first use; 422 if invalid
     head :created
   end
 end
 ```
 
-The schema *is* the allowlist (it reads only declared fields), so params are taken unfiltered. Invalid input raises `Accord::InvalidInput`, rendered as a 422 by a `rescue_from` installed on include.
+`accord` declares a lazily-parsed, memoized reader — decoupled from action names, so a controller can declare several inputs and each action uses whichever it needs. `from:` scopes the source (defaults to `params`):
+
+```ruby
+accord :filters, EmployeeFilters, from: -> { params[:q] }
+```
+
+Prefer calling the schema directly? It's the entry point — `CreateEmployee.parse!(params)` returns the typed input or raises. Either way, invalid input raises `Accord::InvalidInput`, rendered as a 422 by a `rescue_from` installed on include. The schema *is* the allowlist (it reads only declared fields via `[]`/`key?`, which `ActionController::Parameters` permits without `permit`), so params are consumed unfiltered.
+
+Customize the response by overriding one method:
+
+```ruby
+class ApplicationController < ActionController::API
+  include Accord::ControllerHelpers
+
+  def render_accord_errors(error)
+    render json: ErrorSerializer.new(error.errors), status: :unprocessable_entity
+  end
+end
+```
+
+## Configuration
+
+```ruby
+Accord.configure do |c|
+  c.strict = false   # default parse mode; per-call strict: always wins
+end
+```
+
+The shipped default is non-strict — an API boundary tolerates and reports; strict raises on the first coercion failure, for trusted internal callers.
 
 Every tolerated error in permissive mode emits an event you can subscribe to:
 
