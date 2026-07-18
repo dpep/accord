@@ -5,9 +5,11 @@ require_relative "field"
 require_relative "fields/scalar"
 require_relative "fields/object"
 require_relative "fields/array"
+require_relative "fields/money"
 require_relative "validation"
 require_relative "types/string"
 require_relative "types/uuid"
+require_relative "types/iso_currency"
 require_relative "types/boolean"
 require_relative "types/date"
 require_relative "types/decimal"
@@ -57,6 +59,10 @@ module Accord
         field(name, Types::UUID.new(version:), **opts)
       end
 
+      def iso_currency(name, **opts)
+        field(name, Types::ISOCurrency.new, **opts)
+      end
+
       def boolean(name, **opts)
         field(name, Types::Boolean.new, **opts)
       end
@@ -87,6 +93,12 @@ module Accord
       #   array :employees, Employee
       def array(name, schema, **opts)
         register(ArrayField.new(name:, schema:, **opts))
+      end
+
+      # An amount + currency parsed into a money-gem Money value.
+      #   money :salary
+      def money(name, **opts)
+        register(MoneyField.new(name:, **opts))
       end
 
       # Declare a scalar field backed by a Type. Public so custom types can be

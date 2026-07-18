@@ -65,20 +65,40 @@ Decimals are always `BigDecimal`, never `Float` — Floats are rejected in stric
 
 ### Primitives and semantic types
 
-The type system is a small set of primitives (`String`, `Boolean`, `Date`, `Decimal`) plus **semantic specializations** that add parsing, canonicalization, defaults, and OpenAPI metadata without introducing new internal representations:
+The type system is a small set of primitives (`String`, `Boolean`, `Date`, `Decimal`) plus **semantic specializations** that add parsing, canonicalization, defaults, and OpenAPI metadata without introducing new internal representations. **Composite** types (`Money`) compose scalars rather than adding a primitive:
 
 ```
-String              Decimal
-├── UUID            ├── Currency
-                    └── Duration
+String              Decimal            Composite
+├── UUID            ├── Currency       └── Money  (Decimal + ISOCurrency)
+└── ISOCurrency     └── Duration
 ```
 
 ```ruby
 uuid :id                          # canonical lowercase String
+iso_currency :currency            # canonical uppercase ISO-4217 String
 currency :salary                  # BigDecimal, scale 2
 duration :work_time, unit: :hours # BigDecimal, scale 2
 decimal :exchange_rate, scale: 8  # BigDecimal, scale 8
 ```
+
+### Money
+
+`money` parses an amount + currency into a [`money`](https://rubygems.org/gems/money)-gem `Money` value. It composes `Decimal` (amount) and `ISOCurrency` (currency), so errors nest exactly like any other sub-structure — `[:salary, :amount]`, `[:salary, :currency]` — with no special cases.
+
+```ruby
+class Payroll < Accord::Schema
+  money :salary                                # nested: { amount:, currency: }
+  money :bonus, format: :flat                  # flat: bonus + bonus_currency siblings
+  money :stipend, currency: "USD"              # fixed currency, amount only
+end
+
+Payroll.parse(salary: { amount: "1234.50", currency: "usd" }).salary
+# => #<Money fractional:123450 currency:USD>
+```
+
+`dump` always emits the canonical nested form (`{ amount: "1234.50", currency: "USD" }`) regardless of input format, and `openapi` produces an object schema reusing the component scalars.
+
+The `money` gem is an **optional dependency** — only `money` and `iso_currency` need it, and they require it lazily. Add `gem "money"` to your Gemfile to use them.
 
 ## Nested schemas
 

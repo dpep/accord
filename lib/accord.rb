@@ -6,6 +6,7 @@ require_relative "accord/configuration"
 require_relative "accord/type"
 require_relative "accord/types/string"
 require_relative "accord/types/uuid"
+require_relative "accord/types/iso_currency"
 require_relative "accord/types/boolean"
 require_relative "accord/types/date"
 require_relative "accord/types/decimal"
@@ -15,6 +16,7 @@ require_relative "accord/field"
 require_relative "accord/fields/scalar"
 require_relative "accord/fields/object"
 require_relative "accord/fields/array"
+require_relative "accord/fields/money"
 require_relative "accord/validation"
 require_relative "accord/schema"
 
@@ -49,6 +51,15 @@ module Accord
     # raising — so only ever in non-strict mode.
     def instrument(code, **payload)
       notifier&.instrument("accord.parse.#{code}", **payload)
+    end
+
+    # Lazily load the optional `money` gem, which backs the money and
+    # iso_currency types. Raises a helpful error if it isn't installed.
+    def require_money!
+      require "money"
+    rescue LoadError
+      raise Fault, "Accord's `money` and `iso_currency` types require the money gem. " \
+                   "Add `gem \"money\"` to your Gemfile."
     end
   end
 end

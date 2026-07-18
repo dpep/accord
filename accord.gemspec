@@ -21,9 +21,13 @@ Gem::Specification.new do |spec|
   spec.files = Dir["lib/**/*.rb", "README.md", "LICENSE*"]
   spec.require_paths = ["lib"]
 
-  # bigdecimal and date are used for Currency and Date types.
+  # bigdecimal and date back the Decimal and Date types.
   spec.add_dependency "bigdecimal"
 
+  # money is an OPTIONAL dependency: only the `money` and `iso_currency` types
+  # need it, and they require it lazily. Apps using those types add `gem "money"`
+  # themselves; the core gem stays lean and framework-agnostic.
   spec.add_development_dependency "activesupport"
+  spec.add_development_dependency "money"
   spec.add_development_dependency "rspec", "~> 3.0"
 end
