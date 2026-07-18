@@ -24,5 +24,6 @@ Gem::Specification.new do |spec|
   # bigdecimal and date are used for Currency and Date types.
   spec.add_dependency "bigdecimal"
 
+  spec.add_development_dependency "activesupport"
   spec.add_development_dependency "rspec", "~> 3.0"
 end

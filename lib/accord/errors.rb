@@ -68,4 +68,19 @@ module Accord
       super("#{field} is required")
     end
   end
+
+  # Raised when input fails to satisfy a schema. Carries the parsed-but-invalid
+  # schema instance so callers (e.g. Rails integration) can render its errors.
+  class InvalidInput < Fault
+    attr_reader :input
+
+    def initialize(input)
+      @input = input
+      super("input did not satisfy the schema")
+    end
+
+    def errors
+      input.errors
+    end
+  end
 end

@@ -22,8 +22,20 @@ require_relative "accord/schema"
 module Accord
   class << self
     # Optional logger used by permissive standalone type coercion to record
-    # dropped values. Rails integration (Milestone 3) will layer
-    # ActiveSupport::Notifications on top of this hook.
+    # dropped values.
     attr_accessor :logger
+
+    # Optional notifier for permissive-parse events. Any object responding to
+    # `instrument(event, **payload)`. `require "accord/rails"` wires this to
+    # ActiveSupport::Notifications; left nil, instrumentation is a no-op so the
+    # core gem carries no Rails/ActiveSupport dependency.
+    attr_accessor :notifier
+
+    # Emit a permissive-parse event, e.g. "accord.parse.invalid_currency".
+    # Called whenever a schema tolerates and records an error rather than
+    # raising — so only ever in non-strict mode.
+    def instrument(code, **payload)
+      notifier&.instrument("accord.parse.#{code}", **payload)
+    end
   end
 end

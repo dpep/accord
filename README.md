@@ -100,11 +100,42 @@ input.errors.first.to_h
 #      message: "invalid_currency", input: "$abc", value: nil }
 ```
 
+## Rails integration
+
+Opt-in and decoupled — the core gem carries no Rails or ActiveSupport dependency. Load it with:
+
+```ruby
+gem "accord", require: "accord/rails"
+```
+
+This wires permissive-parse events to `ActiveSupport::Notifications` and makes `parse_input` available in controllers:
+
+```ruby
+class EmployeesController < ApplicationController
+  def create
+    input = parse_input(CreateEmployee)   # 422 with structured errors if invalid
+    EmployeeService.call(input)
+    head :created
+  end
+end
+```
+
+The schema *is* the allowlist (it reads only declared fields), so params are taken unfiltered. Invalid input raises `Accord::InvalidInput`, rendered as a 422 by a `rescue_from` installed on include.
+
+Every tolerated error in permissive mode emits an event you can subscribe to:
+
+```ruby
+ActiveSupport::Notifications.subscribe(/accord\.parse/) do |name, *, payload|
+  # name    => "accord.parse.invalid_currency"
+  # payload => { field: :salary, path: [:salary], input: "$abc" }
+end
+```
+
 ## Roadmap
 
 - **Milestone 1 — Core types** ✅ Schema, Field, typed input object, String / Boolean / Date / Currency, Error objects. No Rails dependency.
 - **Milestone 2 — Nested schemas** ✅ `object` and `array` fields, nested error paths.
-- **Milestone 3 — Rails integration** controller helpers, `ActiveSupport::Notifications`, params handling.
+- **Milestone 3 — Rails integration** ✅ controller helpers, `ActiveSupport::Notifications`, params handling.
 - **Milestone 4 — OpenAPI** generate OpenAPI components from a schema.
 
 ## Development

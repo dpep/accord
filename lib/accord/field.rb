@@ -80,7 +80,14 @@ module Accord
 
     # Build an Accord::Error located at this field (path + this field's name).
     def error(path, code, input: nil)
-      Error.new(field: name, path: path + [name], code:, input:)
+      build_error(path: path + [name], code:, input:)
+    end
+
+    # Create a structured error and emit its permissive-parse event. Only ever
+    # reached in non-strict mode (strict paths raise before collecting).
+    def build_error(path:, code:, input: nil)
+      Accord.instrument(code, field: name, path:, input:)
+      Error.new(field: name, path:, code:, input:)
     end
 
     # Parse a raw value through a sub-schema at the given (already-built) path.
@@ -89,7 +96,7 @@ module Accord
       unless raw.respond_to?(:key?)
         raise CoercionError.new(code: :invalid_object, input: raw) if strict
 
-        return [nil, [Error.new(field: name, path:, code: :invalid_object, input: raw)]]
+        return [nil, [build_error(path:, code: :invalid_object, input: raw)]]
       end
 
       sub = schema.parse(raw, strict:, path:)

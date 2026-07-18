@@ -124,12 +124,9 @@ module Accord
     #   error(:code)                  # field-scoped validation
     #   error(:code, field: :salary)  # explicit field
     def error(code, field: @current_field)
-      @errors << Error.new(
-        field:,
-        path: @path + [field].compact,
-        code:,
-        value: field && @values[field],
-      )
+      path = @path + [field].compact
+      Accord.instrument(code, field:, path:, input: nil)
+      @errors << Error.new(field:, path:, code:, value: field && @values[field])
     end
 
     # @api private — orchestrates coercion + validation. Public so
