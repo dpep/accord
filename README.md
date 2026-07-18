@@ -135,8 +135,11 @@ end
 
 - **Milestone 1 — Core types** ✅ Schema, Field, typed input object, String / Boolean / Date / Currency, Error objects. No Rails dependency.
 - **Milestone 2 — Nested schemas** ✅ `object` and `array` fields, nested error paths.
-- **Milestone 3 — Rails integration** ✅ controller helpers, `ActiveSupport::Notifications`, params handling.
-- **Milestone 4 — OpenAPI** generate OpenAPI components from a schema.
+- **Milestone 3 — Rails integration** ✅ controller helpers, `ActiveSupport::Notifications`, params handling. _Refinement in progress: declarative macro, default-mode config, overridable rendering._
+- **Milestone 4 — Typing projection** generate RBS signatures for the parsed result, so `input.salary` is a known `BigDecimal` to Sorbet/Steep/editors — no runtime dependency.
+- **Milestone 5 — OpenAPI** generate OpenAPI components from a schema.
+
+Typing and OpenAPI are both *projections* of the schema — see [docs/design.md](docs/design.md).
 
 ## Development
 
