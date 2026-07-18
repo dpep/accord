@@ -7,6 +7,7 @@ require_relative "fields/object"
 require_relative "fields/array"
 require_relative "validation"
 require_relative "types/string"
+require_relative "types/uuid"
 require_relative "types/boolean"
 require_relative "types/date"
 require_relative "types/decimal"
@@ -50,6 +51,10 @@ module Accord
 
       def string(name, **opts)
         field(name, Types::String.new, **opts)
+      end
+
+      def uuid(name, version: nil, **opts)
+        field(name, Types::UUID.new(version:), **opts)
       end
 
       def boolean(name, **opts)

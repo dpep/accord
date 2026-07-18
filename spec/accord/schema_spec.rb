@@ -132,6 +132,19 @@ RSpec.describe Accord::Schema do
     end
   end
 
+  describe "uuid fields" do
+    let(:schema) do
+      Class.new(described_class) do
+        uuid :id
+      end
+    end
+
+    it "canonicalizes to a lowercase UUID" do
+      input = schema.parse({ id: "550E8400-E29B-41D4-A716-446655440000" })
+      expect(input.id).to eq("550e8400-e29b-41d4-a716-446655440000")
+    end
+  end
+
   describe "duration fields" do
     let(:schema) do
       Class.new(described_class) do

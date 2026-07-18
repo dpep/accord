@@ -54,11 +54,31 @@ Each type implements a common interface: `parse` (permissive), `parse!` (strict)
 | Type | Permissive accepts | Strict accepts | Internal |
 |------|--------------------|----------------|----------|
 | `string`   | String, Symbol, Numeric        | String                     | `String` |
+| `uuid`     | RFC 4122 UUID (any case)       | RFC 4122 UUID              | `String` (canonical lowercase) |
 | `boolean`  | `true`/`false`, `"true"`/`"false"`, `"1"`/`"0"`, `"yes"`/`"no"` | `true`/`false` | `true`/`false` |
 | `date`     | Date, Time, ISO-8601, configured legacy `formats:` | Date, Time, ISO-8601 | `Date` |
-| `currency` | `"10"`, `"10.50"`, `"$10.50"`, `"1,000.00"`, Integer, Float | plain numeric strings, Integer | `BigDecimal` |
+| `decimal`  | numeric strings, Integer, Float | numeric strings, Integer  | `BigDecimal` |
+| `currency` | `"10"`, `"$10.50"`, `"1,000.00"`, Integer, Float | plain numeric strings, Integer | `BigDecimal` |
+| `duration` | plain numbers                  | plain numbers, Integer     | `BigDecimal` |
 
-Currency is always `BigDecimal`, never `Float` — Floats are rejected in strict mode and routed through their string form otherwise, so binary rounding never enters the pipeline.
+Decimals are always `BigDecimal`, never `Float` — Floats are rejected in strict mode and routed through their string form otherwise, so binary rounding never enters the pipeline. `decimal`/`currency`/`duration` take a `scale:` (decimal places), enforced on parse; excess precision is rejected unless `round: true` is set. `dump` renders exactly `scale` places.
+
+### Primitives and semantic types
+
+The type system is a small set of primitives (`String`, `Boolean`, `Date`, `Decimal`) plus **semantic specializations** that add parsing, canonicalization, defaults, and OpenAPI metadata without introducing new internal representations:
+
+```
+String              Decimal
+├── UUID            ├── Currency
+                    └── Duration
+```
+
+```ruby
+uuid :id                          # canonical lowercase String
+currency :salary                  # BigDecimal, scale 2
+duration :work_time, unit: :hours # BigDecimal, scale 2
+decimal :exchange_rate, scale: 8  # BigDecimal, scale 8
+```
 
 ## Nested schemas
 
