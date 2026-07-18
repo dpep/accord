@@ -48,6 +48,45 @@ RSpec.describe "money type" do
     end
   end
 
+  describe "currency-aware amount scale" do
+    let(:schema) do
+      Class.new(Accord::Schema) do
+        money :salary
+      end
+    end
+
+    it "enforces the amount precision from the currency (USD → 2)" do
+      input = schema.parse({ salary: { amount: "1234.567", currency: "USD" } })
+
+      expect(input).not_to be_valid
+      expect(input.errors.map(&:path)).to include([:salary, :amount])
+    end
+
+    it "accepts the precision the currency allows (BHD → 3)" do
+      input = schema.parse({ salary: { amount: "1.234", currency: "BHD" } })
+
+      expect(input).to be_valid
+      expect(input.salary).to eq(Money.from_amount(BigDecimal("1.234"), "BHD"))
+    end
+
+    it "rejects fractional units a zero-decimal currency lacks (JPY → 0)" do
+      input = schema.parse({ salary: { amount: "1234.5", currency: "JPY" } })
+
+      expect(input.errors.map(&:path)).to include([:salary, :amount])
+    end
+
+    it "accepts whole amounts for zero-decimal currencies" do
+      input = schema.parse({ salary: { amount: "1234", currency: "JPY" } })
+
+      expect(input.salary).to eq(Money.from_amount(BigDecimal("1234"), "JPY"))
+    end
+
+    it "raises in strict mode when the amount is too precise for the currency" do
+      expect { schema.parse({ salary: { amount: "1234.5", currency: "JPY" } }, strict: true) }
+        .to raise_error(Accord::CoercionError)
+    end
+  end
+
   describe "flat wire format" do
     let(:schema) do
       Class.new(Accord::Schema) do

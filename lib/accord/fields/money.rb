@@ -22,16 +22,17 @@ module Accord
   class MoneyField < Field
     FORMATS = %i[nested flat].freeze
 
-    def initialize(format: :nested, currency: nil, amount_field: nil, currency_field: nil, **opts)
+    def initialize(format: :nested, currency: nil, round: false, amount_field: nil, currency_field: nil, **opts)
       super(**opts)
       Accord.require_money!
       raise ArgumentError, "unknown money format: #{format.inspect}" unless FORMATS.include?(format)
 
       @format = format
-      @amount_type = Types::Decimal.new(scale: 2)
+      @round = round
+      @amount_type = Types::Decimal.new # representative instance for OpenAPI (scale-independent)
       @currency_type = Types::ISOCurrency.new
       @fixed_currency = currency ? @currency_type.parse!(currency) : nil
-      @amount = ScalarField.new(name: amount_key(amount_field), type: @amount_type, required: true)
+      @amount_name = amount_key(amount_field)
       @currency = ScalarField.new(name: currency_key(currency_field), type: @currency_type, required: true)
     end
 
@@ -83,8 +84,9 @@ module Accord
           [input, path]
         end
 
-      amount = @amount.resolve(component_input, strict:, path: component_path)
+      # Resolve the currency first so the amount's scale is currency-aware.
       currency = resolve_currency(component_input, strict:, path: component_path)
+      amount = amount_field(currency).resolve(component_input, strict:, path: component_path)
       errors = amount.errors + currency.errors
       return Result.new(nil, errors) unless errors.empty?
 
@@ -95,6 +97,14 @@ module Accord
       return Result.ok(@fixed_currency) if @fixed_currency
 
       @currency.resolve(input, strict:, path:)
+    end
+
+    # A Decimal whose scale matches the resolved currency's subunit precision
+    # (USD → 2, JPY → 0, BHD → 3), so excess precision is rejected per currency.
+    # Falls back to the default scale when the currency couldn't be determined.
+    def amount_field(currency)
+      scale = currency.value ? Money::Currency.find(currency.value).exponent : Types::Decimal::DEFAULT_SCALE
+      ScalarField.new(name: @amount_name, type: Types::Decimal.new(scale:, round: @round), required: true)
     end
 
     def nested_shape_error(raw, strict:, path:)

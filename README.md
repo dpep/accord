@@ -96,7 +96,7 @@ Payroll.parse(salary: { amount: "1234.50", currency: "usd" }).salary
 # => #<Money fractional:123450 currency:USD>
 ```
 
-`dump` always emits the canonical nested form (`{ amount: "1234.50", currency: "USD" }`) regardless of input format, and `openapi` produces an object schema reusing the component scalars.
+The amount's precision is **currency-aware**: it's validated against the currency's subunit exponent (USD → 2, JPY → 0, BHD → 3), so `{ amount: "1234.5", currency: "JPY" }` is rejected while `{ amount: "1.234", currency: "BHD" }` is accepted. `dump` always emits the canonical nested form (`{ amount: "1234.50", currency: "USD" }`) regardless of input format, and `openapi` produces an object schema reusing the component scalars.
 
 The `money` gem is an **optional dependency** — only `money` and `iso_currency` need it, and they require it lazily. Add `gem "money"` to your Gemfile to use them.
 
