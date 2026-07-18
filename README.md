@@ -60,6 +60,36 @@ Each type implements a common interface: `parse` (permissive), `parse!` (strict)
 
 Currency is always `BigDecimal`, never `Float` — Floats are rejected in strict mode and routed through their string form otherwise, so binary rounding never enters the pipeline.
 
+## Nested schemas
+
+Compose schemas with `object` and `array`:
+
+```ruby
+class Address < Accord::Schema
+  string :city, required: true
+  string :zip
+end
+
+class Employee < Accord::Schema
+  string :name, required: true
+  currency :salary
+  object :address, Address
+end
+
+class CreatePayroll < Accord::Schema
+  array :employees, Employee
+end
+```
+
+Nested values are parsed schema instances, and errors bubble up as one flat list with precise paths:
+
+```ruby
+input = CreatePayroll.parse(params)
+input.employees[2].salary          # => BigDecimal
+input.errors.map(&:path)
+# => [[:employees, 2, :salary], [:employees, 0, :address, :city]]
+```
+
 ## Errors
 
 Errors are first-class objects (`Accord::Error`) carrying `field`, `path`, `code`, `message`, `input`, and `value`. Paths are arrays so nested schemas (coming next) can point at `[:employees, 2, :salary]`.
@@ -73,7 +103,7 @@ input.errors.first.to_h
 ## Roadmap
 
 - **Milestone 1 — Core types** ✅ Schema, Field, typed input object, String / Boolean / Date / Currency, Error objects. No Rails dependency.
-- **Milestone 2 — Nested schemas** `object` and `array` fields, nested error paths.
+- **Milestone 2 — Nested schemas** ✅ `object` and `array` fields, nested error paths.
 - **Milestone 3 — Rails integration** controller helpers, `ActiveSupport::Notifications`, params handling.
 - **Milestone 4 — OpenAPI** generate OpenAPI components from a schema.
 

@@ -2,6 +2,9 @@
 
 require_relative "errors"
 require_relative "field"
+require_relative "fields/scalar"
+require_relative "fields/object"
+require_relative "fields/array"
 require_relative "validation"
 require_relative "types/string"
 require_relative "types/boolean"
@@ -59,11 +62,29 @@ module Accord
         field(name, Types::Currency.new, **opts)
       end
 
-      # Register a field and define its reader.
+      # A nested schema. The parsed value is a sub-schema instance.
+      #   object :address, Address
+      def object(name, schema, **opts)
+        register(ObjectField.new(name:, schema:, **opts))
+      end
+
+      # A list of nested schemas. Each element is parsed through `schema`.
+      #   array :employees, Employee
+      def array(name, schema, **opts)
+        register(ArrayField.new(name:, schema:, **opts))
+      end
+
+      # Declare a scalar field backed by a Type. Public so custom types can be
+      # registered directly.
       def field(name, type, **opts)
-        fields[name] = Field.new(name:, type:, **opts)
-        define_method(name) { @values[name] }
-        name
+        register(ScalarField.new(name:, type:, **opts))
+      end
+
+      # Register a field and define its reader.
+      def register(field)
+        fields[field.name] = field
+        define_method(field.name) { @values[field.name] }
+        field.name
       end
 
       def validate(field = nil, &block)
@@ -117,15 +138,9 @@ module Accord
       @path = path
 
       self.class.fields.each_value do |field|
-        @values[field.name] = field.coerce(input, strict:)
-      rescue CoercionError => e
-        raise if strict
-
-        record_coercion_error(field, e)
-      rescue MissingField
-        raise if strict
-
-        record_missing(field)
+        result = field.resolve(input, strict:, path:)
+        @values[field.name] = result.value
+        @errors.concat(result.errors)
       end
 
       run_validations
@@ -133,24 +148,6 @@ module Accord
     end
 
     private
-
-    def record_coercion_error(field, error)
-      @values[field.name] = nil
-      @errors << Error.new(
-        field: field.name,
-        path: @path + [field.name],
-        code: error.code,
-        input: error.input,
-      )
-    end
-
-    def record_missing(field)
-      @errors << Error.new(
-        field: field.name,
-        path: @path + [field.name],
-        code: :required,
-      )
-    end
 
     # Validations run in declaration order, after all fields are coerced.
     # A field-scoped validation is skipped when its field is absent/nil or
