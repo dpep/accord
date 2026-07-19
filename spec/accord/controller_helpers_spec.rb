@@ -79,6 +79,27 @@ RSpec.describe Accord::ControllerHelpers do
       expect(controller.employee.name).to eq("Ada")
     end
 
+    it "defines an anonymous schema inline from a block" do
+      controller = build_controller do
+        accord :employee do
+          string :name, :required
+        end
+      end.new({ name: "Ada" })
+
+      expect(controller.employee.name).to eq("Ada")
+    end
+
+    it "requires either a schema or a block" do
+      expect { build_controller { accord :employee } }.to raise_error(ArgumentError)
+    end
+
+    it "rejects both a schema and a block" do
+      input = schema
+      expect do
+        build_controller { accord(:employee, input) { string :name } }
+      end.to raise_error(ArgumentError)
+    end
+
     it "raises InvalidInput, rendered as a 422, for invalid params" do
       input = schema
       controller = build_controller { accord :employee, input }.new({})

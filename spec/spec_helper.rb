@@ -1,5 +1,6 @@
 require "debug"
 require "rspec"
+require "rspec/matchers/fail_matchers"
 require "simplecov"
 
 SimpleCov.start do
@@ -16,6 +17,9 @@ require "accord"
 RSpec.configure do |config|
   # allow "fit" examples
   config.filter_run_when_matching :focus
+
+  # expect { ... }.to fail
+  config.include RSpec::Matchers::FailMatchers
 
   config.expect_with(:rspec) { |c| c.syntax = :expect }
   config.disable_monkey_patching!

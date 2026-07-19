@@ -111,6 +111,19 @@ end
 - **Memoized** — accessing `employee` twice parses once.
 - **`from:`** — a proc, evaluated in controller context, that scopes the source (defaults to `params`). Use it for nested payloads (`params[:employee]`) or query strings (`params[:q]`).
 
+### Inline schemas
+
+Pass a block instead of a schema class to define an anonymous schema right in the controller — handy for a simple, single-use input that doesn't warrant its own file:
+
+```ruby
+accord :search, from: -> { params.fetch(:q, {}) } do
+  string  :name
+  boolean :active
+end
+```
+
+Reach for a named schema class when you want reuse across controllers, isolated schema tests, or an OpenAPI/RBS/GraphQL projection — those need a named schema, and an inline one is anonymous. `accord` requires exactly one of a schema class or a block.
+
 Eager validation (fail before the action body) is just a `before_action`:
 
 ```ruby

@@ -55,6 +55,14 @@ class EmployeesController < ApplicationController
   accord :employee, CreateEmployee
   accord :filters,  EmployeeFilters, from: -> { params.fetch(:q, {}) }
 
+  # A block defines the schema inline — handy for a simple, single-use input
+  # that doesn't warrant its own class. (Named classes still win when you want
+  # reuse, isolated tests, or an OpenAPI/RBS/GraphQL projection.)
+  accord :search, from: -> { params.fetch(:q, {}) } do
+    string  :name
+    boolean :active
+  end
+
   # POST /employees
   #   { "name": "Ada", "email": "ada@example.com", "salary": "$65,000" }
   # -> 201, or 422 { "errors": { "salary": ["not_positive"] } } if invalid.

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "errors"
+require_relative "schema"
 
 module Accord
   # Rails controller integration. The schema is the entry point — call
@@ -35,8 +36,28 @@ module Accord
     end
 
     module ClassMethods
-      # Declare a memoized input reader backed by a schema.
-      def accord(name, schema, from: nil)
+      # Declare a memoized input reader backed by a schema. Pass a schema class,
+      # or a block to define an anonymous schema inline:
+      #
+      #   accord :employee, CreateEmployee          # reuse a named schema
+      #
+      #   accord :employee do                       # inline, single-use
+      #     string   :name, :required
+      #     currency :salary, :positive
+      #   end
+      #
+      # Inline schemas are convenient for a simple, one-off input; reach for a
+      # named class when you want reuse, isolated tests, or an OpenAPI/RBS/
+      # GraphQL projection (those require a named schema).
+      def accord(name, schema = nil, from: nil, &block)
+        if block
+          raise ArgumentError, "accord :#{name} takes a schema or a block, not both" if schema
+
+          schema = Class.new(Schema, &block)
+        elsif schema.nil?
+          raise ArgumentError, "accord :#{name} requires a schema class or a block"
+        end
+
         define_method(name) { accord_input(name, schema, from) }
       end
     end
