@@ -48,9 +48,13 @@ class EmployeesController < ApplicationController
     string  :name
     boolean :active
   end
-  # (3) proc — reaches what a key can't: a JSON:API body nests the attributes
-  # under data/attributes. Same schema, different wire shape.
-  accord :imported, CreateEmployee, from: -> { params.dig(:data, :attributes) }
+  # (3) proc + array field — a JSON:API list arrives as a bare array under
+  # `data`; the proc reshapes it into { employees: [...] } so an `array` field
+  # parses each element through CreateEmployee (errors nest, e.g.
+  # [:employees, 2, :salary]).
+  accord :batch, from: -> { { employees: params[:data] } } do
+    array :employees, CreateEmployee
+  end
 
   # POST /employees  { "name": "Ada", "email": "ada@x.co", "salary": "$65,000" }
   # -> 201 (active defaults to true, role to "member"), or 422 if invalid.
@@ -66,9 +70,10 @@ class EmployeesController < ApplicationController
     render json: scope
   end
 
-  # POST /employees/import  { "data": { "attributes": { "name": "Ada", ... } } }
+  # POST /employees/import  { "data": [ { "name": "Ada", ... }, { "name": "Bo", ... } ] }
   def import
-    render json: Employee.create!(imported.to_h), status: :created
+    Employee.insert_all!(batch.employees.map(&:to_h))   # all-or-nothing: one 422 lists every bad row
+    head :created
   end
 end
 
@@ -79,7 +84,9 @@ end
 # * Invalid input raises Accord::InvalidInput, rendered as a 422 by a
 #   rescue_from installed when the concern is included. The action body never
 #   runs on bad input.
-# * The inline `search` schema is named `EmployeesController::SearchInput`, so it
-#   still projects to OpenAPI/RBS/RBI like a top-level schema class.
+# * Inline schemas are named as controller constants (`search` ->
+#   `EmployeesController::SearchInput`), so they still project to OpenAPI/RBS/RBI;
+#   pass `const:` to choose the name, and accord refuses to clobber an existing
+#   non-schema constant.
 # * Observability: subscribe to `accord.parse.*` ActiveSupport notifications to
 #   track malformed-input rates (great during an API migration).

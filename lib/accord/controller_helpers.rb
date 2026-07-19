@@ -49,15 +49,21 @@ module Accord
       #   end
       #
       # Inline schemas are convenient for a simple, one-off input; reach for a
-      # named class when you want reuse, isolated tests, or an OpenAPI/RBS/
-      # GraphQL projection (those require a named schema).
-      def accord(name, schema = nil, from: nil, &block)
+      # named class when you want reuse or isolated tests. The inline schema is
+      # named as a controller constant (`:employee` -> `EmployeeInput`) so it
+      # still projects to OpenAPI/RBS/RBI/GraphQL; pass `const:` to choose that
+      # name explicitly:
+      #
+      #   accord :employee, const: :NewHire do ... end   # -> NewHire constant
+      def accord(name, schema = nil, from: nil, const: nil, &block)
         if block
           raise ArgumentError, "accord :#{name} takes a schema or a block, not both" if schema
 
-          schema = define_inline_schema(name, &block)
+          schema = define_inline_schema(name, const, &block)
         elsif schema.nil?
           raise ArgumentError, "accord :#{name} requires a schema class or a block"
+        elsif const
+          raise ArgumentError, "accord :#{name}: `const:` only applies to an inline (block) schema"
         end
 
         define_method(name) { accord_input(name, schema, from) }
@@ -66,12 +72,22 @@ module Accord
       private
 
       # Build an anonymous schema from a block and name it as a controller
-      # constant (`:employee` -> `EmployeeInput`), so it projects to OpenAPI/RBS/
-      # RBI/GraphQL like a top-level schema class. The `Input` suffix avoids
-      # shadowing a same-named model constant inside the controller.
-      def define_inline_schema(name, &block)
-        const = "#{name.to_s.split(/[^a-zA-Z0-9]+/).map(&:capitalize).join}Input"
-        remove_const(const) if const_defined?(const, false)
+      # constant so it projects like a top-level schema class. The default name
+      # (`:employee` -> `EmployeeInput`) carries an `Input` suffix to avoid
+      # shadowing a same-named model. Refuses to clobber an existing constant
+      # that isn't itself an Accord schema — pass `const:` to pick another name.
+      def define_inline_schema(name, const, &block)
+        const = (const || "#{name.to_s.split(/[^a-zA-Z0-9]+/).map(&:capitalize).join}Input").to_s
+
+        if const_defined?(const, false)
+          existing = const_get(const)
+          unless existing.is_a?(Class) && existing < Schema
+            raise ArgumentError,
+                  "accord :#{name} would overwrite the existing constant #{const} — pass `const:` to choose another name"
+          end
+          remove_const(const)
+        end
+
         const_set(const, Class.new(Schema, &block))
       end
     end

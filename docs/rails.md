@@ -122,7 +122,7 @@ accord :search, from: :q do
 end
 ```
 
-The inline schema is named as a controller constant (`:search` → `SearchController::SearchInput`), so it still projects to OpenAPI/RBS/RBI. Reach for a top-level named class when you want reuse across controllers or isolated schema tests. `accord` requires exactly one of a schema class or a block.
+The inline schema is named as a controller constant (`:search` → `SearchController::SearchInput`), so it still projects to OpenAPI/RBS/RBI. Pass `const:` to choose the name (`accord :search, const: :SearchParams do … end`); accord refuses to clobber an existing constant that isn't itself a schema. Reach for a top-level named class when you want reuse across controllers or isolated schema tests. `accord` requires exactly one of a schema class or a block.
 
 Eager validation (fail before the action body) is just a `before_action`:
 

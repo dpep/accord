@@ -113,6 +113,37 @@ RSpec.describe Accord::ControllerHelpers do
       expect(SearchController::QueryInput.rbi).to include("< Accord::Schema")
     end
 
+    it "refuses to overwrite an existing non-schema constant" do
+      expect do
+        build_controller do
+          const_set(:ReportInput, Class.new)   # a pre-existing, non-accord constant
+          accord :report do
+            string :name
+          end
+        end
+      end.to raise_error(ArgumentError, /overwrite/)
+    end
+
+    it "names the inline schema explicitly with const:" do
+      controller = build_controller
+      stub_const("ReportsController", controller)
+      controller.class_eval do
+        accord :report, const: :ReportParams do
+          string :name, :required
+        end
+      end
+
+      expect(ReportsController::ReportParams.name).to eq("ReportsController::ReportParams")
+      expect(controller.const_defined?(:ReportInput, false)).to be(false)  # default name unused
+    end
+
+    it "rejects const: without a block" do
+      input = schema
+      expect do
+        build_controller { accord :employee, input, const: :Foo }
+      end.to raise_error(ArgumentError, /inline/)
+    end
+
     it "requires either a schema or a block" do
       expect { build_controller { accord :employee } }.to raise_error(ArgumentError)
     end
