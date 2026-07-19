@@ -48,7 +48,7 @@ input.errors.map(&:to_h)           # structured, render however you like
 - **Structured errors, not strings.** Every `Accord::Error` is data — `path`, `code`, `field`, `validator`, `value`, `metadata` — so rendering (JSON, GraphQL, i18n) stays a separate concern. Nested schemas produce nested paths (`[:employees, 2, :salary]`) with no special handling.
 - **Rails integration, opt-in.** The core gem carries no Rails dependency. Require `accord/rails` and a Railtie adds the `accord` controller macro, 422 rendering, and permissive-parse events over `ActiveSupport::Notifications`.
 - **Typing projections.** `Schema.rbs` and `Schema.rbi` generate typed reader signatures; a bundled Tapioca DSL compiler auto-generates RBI under `tapioca dsl`. Steep consumes the RBS, Sorbet the RBI — no manual conversion.
-- **OpenAPI (in progress).** Validators already contribute constraints (`between 0..100` → `minimum`/`maximum`, `inclusion [...]` → `enum`); full document generation is on the roadmap.
+- **OpenAPI.** `Schema.openapi` generates an object schema — properties, `required`, and validator-derived constraints (`between 0..100` → `minimum`/`maximum`, `inclusion [...]` → `enum`), nested schemas by `$ref`. `Accord.openapi_schemas(...)` builds the components map, ready to feed [rswag](docs/openapi.md#rswag).
 
 New here? Start with **[getting started](docs/getting_started.md)** — install to first schema in a few minutes — then the **[Rails guide](docs/rails.md)**. Or browse the runnable **[examples](examples/)**.
 
@@ -109,6 +109,7 @@ Where to go next:
 | Understand the type system | [Types](docs/types.md) |
 | Declare and register validators | [Validation](docs/validation.md) |
 | Render structured errors | [Errors](docs/errors.md) |
+| Generate OpenAPI / wire up rswag | [OpenAPI](docs/openapi.md) |
 | Generate RBS / RBI for Sorbet or Steep | [Typing](docs/typing.md) |
 
 ## License

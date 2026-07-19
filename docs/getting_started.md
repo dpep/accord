@@ -69,8 +69,8 @@ CreateEmployee.parse!(salary: "-5")   # => raises Accord::InvalidInput
 The one declaration is the source of truth for more than parsing:
 
 ```ruby
-CreateEmployee.fields[:salary].openapi   # => { type: "string", format: "decimal" }  (+ validator constraints)
-CreateEmployee.rbs                        # => an RBS class with typed reader signatures
+CreateEmployee.openapi   # => an OpenAPI object schema (properties, required, validator constraints)
+CreateEmployee.rbs       # => an RBS class with typed reader signatures
 ```
 
 ## Next

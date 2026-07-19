@@ -55,6 +55,13 @@ module Accord
       notifier&.instrument("accord.parse.#{code}", **payload)
     end
 
+    # Merge the OpenAPI component schemas of several schemas (each plus its
+    # nested schemas) into one map — for an OpenAPI `components: { schemas: ... }`
+    # section. See docs/openapi.md.
+    def openapi_schemas(*schemas)
+      schemas.each_with_object({}) { |schema, into| schema.openapi_schemas(into) }
+    end
+
     # Lazily load the optional `money` gem, which backs the money and
     # iso_currency types. Raises a helpful error if it isn't installed.
     def require_money!

@@ -44,12 +44,17 @@ Canonicalization is a fundamental responsibility of every type — the reason eq
 "usd"                                 -> "USD"
 ```
 
-`dump` reverses it to the canonical external form:
+`dump` reverses it to the canonical external form. A type carries config (a `Currency`'s `scale`, a `Date`'s `formats`) and is reused across values, so `dump` takes the value — `type.dump(value)`. For the no-config case there are class-method delegators (over a default-config instance):
 
 ```ruby
-Accord::Types::Currency.new.dump(BigDecimal("1000.5"))   # => "1000.50"  (exactly `scale` places)
-Accord::Types::UUID.new.dump("550E8400-...")             # => "550e8400-..."
+Accord::Types::UUID.dump("550E8400-...")            # => "550e8400-..."
+Accord::Types::Currency.dump(BigDecimal("1000.5"))  # => "1000.50"  (default scale 2)
+
+# with non-default config, use an instance:
+Accord::Types::Currency.new(scale: 4).dump(BigDecimal("1.5"))  # => "1.5000"
 ```
+
+Inside a schema you rarely call this directly — projections (`dump`, `openapi`) use it for you.
 
 ## Decimals: scale and rounding
 

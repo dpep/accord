@@ -17,7 +17,11 @@ module Accord
     end
 
     def openapi
-      { type: "array", items: { type: "object" } }
+      { type: "array", items: openapi_ref(schema) }
+    end
+
+    def nested_schema
+      schema
     end
 
     def rbs

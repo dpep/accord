@@ -72,6 +72,8 @@ end
 # --- Projections: the one declaration also documents & types -----------------
 section "Projections"
 
-puts "salary OpenAPI  #{CreateEmployee.fields[:salary].openapi}"
+require "json"
+puts "OpenAPI schema:"
+puts JSON.pretty_generate(CreateEmployee.openapi)
 puts "\nRBS:"
 puts CreateEmployee.rbs

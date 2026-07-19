@@ -163,6 +163,34 @@ module Accord
         ["class #{class_name} < Accord::Schema", *signatures, "end"].join("\n")
       end
 
+      # Project this schema into an OpenAPI object schema: properties (each field
+      # contributes its type and any validator constraints), a `required` list,
+      # and nested schemas referenced by `$ref`. Pair with #openapi_schemas for
+      # the components section. See docs/openapi.md (including rswag).
+      def openapi
+        properties = {}
+        required = []
+        fields.each_value do |field|
+          properties[field.name] = field.openapi
+          required << field.name if field.required?
+        end
+
+        schema = { type: "object", properties: }
+        schema[:required] = required unless required.empty?
+        schema
+      end
+
+      # Every named schema in this schema's graph (itself plus nested object and
+      # array schemas), keyed by class name — ready for an OpenAPI
+      # `components: { schemas: ... }` section.
+      def openapi_schemas(into = {})
+        return into if name.nil? || into.key?(name)
+
+        into[name] = openapi
+        fields.each_value { |field| field.nested_schema&.openapi_schemas(into) }
+        into
+      end
+
       # Project this schema into a Sorbet RBI class declaration — the RBI sibling
       # of #rbs, for Sorbet-typed codebases. Prefer the bundled Tapioca DSL
       # compiler (auto-discovered by `tapioca dsl`) for Sorbet projects; this is

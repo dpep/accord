@@ -113,6 +113,18 @@ module Accord
       required? || has_default?
     end
 
+    # The nested schema class this field references (object/array fields), or
+    # nil. Drives OpenAPI component collection.
+    def nested_schema
+      nil
+    end
+
+    # An OpenAPI $ref to a named schema's component, or the inline schema for an
+    # anonymous one.
+    def openapi_ref(schema)
+      schema.name ? { "$ref" => "#/components/schemas/#{schema.name}" } : schema.openapi
+    end
+
     private
 
     # @abstract Coerce a present (non-nil) raw value into a Result.
