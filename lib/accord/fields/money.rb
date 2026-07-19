@@ -28,6 +28,11 @@ module Accord
   class MoneyField < Field
     FORMATS = %i[nested flat].freeze
 
+    # The canonical GraphQL input type for money — its dump shape, regardless of
+    # the wire format declared on the field.
+    GRAPHQL_INPUT_NAME = "MoneyInput"
+    GRAPHQL_INPUT = "input MoneyInput {\n  amount: String!\n  currency: String!\n}"
+
     def initialize(format: :nested, currency: nil, default_currency: nil, round: false,
                    amount_field: nil, currency_field: nil, **opts)
       super(**opts)
@@ -79,6 +84,14 @@ module Accord
 
     def sorbet
       "Money"
+    end
+
+    def graphql_ref
+      GRAPHQL_INPUT_NAME
+    end
+
+    def graphql_schemas(into)
+      into[GRAPHQL_INPUT_NAME] ||= GRAPHQL_INPUT
     end
 
     private

@@ -51,9 +51,39 @@ end
 CreateOrder.parse(args).errors.map(&:path)   # => [[:line_items, 2, :quantity], ...]
 ```
 
-### Generating GraphQL types (projection)
+### Generating GraphQL input types (projection)
 
-Emitting a GraphQL **input type** from an Accord schema is the same idea as `Schema.openapi`/`Schema.rbs` — a projection over the field→type mapping, which `Schema.fields` exposes (each field's type, validators, `required?`). It isn't built in yet, but the metadata is all there for a small generator. (Contributions welcome.)
+`Schema.graphql` projects a schema into GraphQL input-type SDL — the same idea as `Schema.openapi`/`Schema.rbs`. Scalars map to GraphQL scalars (`Int`, `Boolean`, `ISO8601Date`; decimals/UUIDs/etc. travel as `String`, matching `dump`), nested `object`/`array` fields become nested input types, `money` becomes a shared `MoneyInput`, and **required fields are non-null**:
+
+```ruby
+class Address < Accord::Schema
+  string :city, :required
+  string :country, :required
+end
+
+class CreateOrder < Accord::Schema
+  string :email, :required
+  object :address, Address, :required
+  array  :line_items, LineItem
+  money  :total
+end
+
+CreateOrder.graphql
+# input CreateOrderInput {
+#   email: String!
+#   address: AddressInput!
+#   line_items: [LineItemInput!]
+#   total: MoneyInput
+# }
+```
+
+`Schema.graphql_schemas` returns the whole graph (the root, every nested input type, and `MoneyInput`) keyed by name — join it into one SDL document:
+
+```ruby
+CreateOrder.graphql_schemas.values.join("\n\n")   # AddressInput, LineItemInput, MoneyInput, CreateOrderInput
+```
+
+`ISO8601Date`/`ISO8601DateTime` are graphql-ruby's date scalars; if you don't use them, treat those fields as `String`. Runnable example: [`examples/graphql.rb`](../examples/graphql.rb).
 
 ## RABL
 
@@ -74,7 +104,7 @@ object @input
 attributes :name, :salary, :hired_on
 ```
 
-`input.salary` is a `BigDecimal` there; for the canonical *string* form in the payload, use `Schema#dump` (above) or dump the field's type. Typically, though, RABL renders your **domain/model** object (the thing you built from the validated input), with Accord's job — turning untrusted params into that trusted input — already done.
+`input.salary` is a `BigDecimal` there; for the canonical *string* form in the payload, use `Schema#dump` (above) or dump the field's type. Typically, though, RABL renders your **domain/model** object (the thing you built from the validated input), with Accord's job — turning untrusted params into that trusted input — already done. Runnable example: [`examples/rabl.rb`](../examples/rabl.rb).
 
 ---
 

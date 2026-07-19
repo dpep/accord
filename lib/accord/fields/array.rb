@@ -36,6 +36,11 @@ module Accord
       "T::Array[#{schema.name || "T.untyped"}]"
     end
 
+    def graphql_ref
+      element = schema.graphql_input_name || raise(ArgumentError, "cannot generate GraphQL for an anonymous nested schema")
+      "[#{element}!]"
+    end
+
     private
 
     def coerce_present(raw, strict:, path:)

@@ -35,6 +35,11 @@ module Accord
         "Date"
       end
 
+      # graphql-ruby's ISO8601Date scalar (or String if you don't use it).
+      def graphql
+        "ISO8601Date"
+      end
+
       private
 
       def coerce(value, strict:)

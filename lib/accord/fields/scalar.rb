@@ -34,6 +34,10 @@ module Accord
       type.sorbet
     end
 
+    def graphql_ref
+      type.graphql
+    end
+
     private
 
     def coerce_present(raw, strict:, path:)

@@ -24,6 +24,10 @@ module Accord
         "T::Boolean"
       end
 
+      def graphql
+        "Boolean"
+      end
+
       private
 
       def coerce(value, strict:)

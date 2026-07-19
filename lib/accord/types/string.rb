@@ -25,6 +25,10 @@ module Accord
         "String"
       end
 
+      def graphql
+        "String"
+      end
+
       private
 
       def coerce(value, strict:)

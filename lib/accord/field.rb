@@ -119,10 +119,29 @@ module Accord
       nil
     end
 
+    # The GraphQL type reference for this field inside an input block, e.g.
+    # "String!", "AddressInput", "[EmployeeInput!]!". Required fields are non-null.
+    def graphql_type
+      required? ? "#{graphql_ref}!" : graphql_ref
+    end
+
+    # Collect the named GraphQL input types this field depends on into `into`
+    # (name => SDL). Mirrors the nested_schema-driven OpenAPI collection; scalar
+    # fields contribute nothing.
+    def graphql_schemas(into)
+      nested_schema&.graphql_schemas(into)
+    end
+
     # An OpenAPI $ref to a named schema's component, or the inline schema for an
     # anonymous one.
     def openapi_ref(schema)
       schema.name ? { "$ref" => "#/components/schemas/#{schema.name}" } : schema.openapi
+    end
+
+    # The bare GraphQL type reference, without nullability. Subclasses supply it;
+    # #graphql_type adds the non-null "!" for required fields.
+    def graphql_ref
+      raise NotImplementedError, "#{self.class} must implement #graphql_ref"
     end
 
     private

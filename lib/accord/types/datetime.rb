@@ -37,6 +37,11 @@ module Accord
         "Time"
       end
 
+      # graphql-ruby's ISO8601DateTime scalar (or String if you don't use it).
+      def graphql
+        "ISO8601DateTime"
+      end
+
       private
 
       def coerce(value, strict:)

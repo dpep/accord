@@ -65,6 +65,13 @@ module Accord
       raise NotImplementedError, "#{self.class} must implement #sorbet"
     end
 
+    # The GraphQL scalar type this maps to, e.g. "String", "Int", "Boolean".
+    # Semantic scalars whose canonical external form is a string (UUID, Decimal,
+    # ...) map to "String"; that's the dump representation a client sends.
+    def graphql
+      raise NotImplementedError, "#{self.class} must implement #graphql"
+    end
+
     # Short symbol name for a type, e.g. Accord::Types::Currency -> :currency.
     def type_name
       self.class.name.split("::").last.gsub(/([a-z])([A-Z])/, '\1_\2').downcase.to_sym

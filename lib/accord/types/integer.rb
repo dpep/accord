@@ -23,6 +23,10 @@ module Accord
         "Integer"
       end
 
+      def graphql
+        "Int"
+      end
+
       private
 
       def coerce(value, strict:)

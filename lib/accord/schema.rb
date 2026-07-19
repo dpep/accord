@@ -154,6 +154,35 @@ module Accord
         into
       end
 
+      # Project this schema into a GraphQL input type (SDL). Each field maps to a
+      # GraphQL type — scalars via their type, nested object/array fields to
+      # nested input types (`AddressInput`, `[EmployeeInput!]`) — and required
+      # fields are non-null. Pair with #graphql_schemas for the full document.
+      # See docs/integrations.md.
+      def graphql(type_name: graphql_input_name)
+        raise ArgumentError, "cannot generate GraphQL for an anonymous schema — pass type_name:" if type_name.nil?
+
+        lines = fields.each_value.map { |field| "  #{field.name}: #{field.graphql_type}" }
+        ["input #{type_name} {", *lines, "}"].join("\n")
+      end
+
+      # The conventional GraphQL input type name for this schema (its class name
+      # suffixed with `Input`), or nil for an anonymous schema.
+      def graphql_input_name
+        "#{name}Input" if name
+      end
+
+      # Every named GraphQL input type in this schema's graph (itself plus nested
+      # object/array schemas and any MoneyInput), keyed by name — ready to join
+      # into one SDL document: `Schema.graphql_schemas.values.join("\n\n")`.
+      def graphql_schemas(into = {})
+        return into if name.nil? || into.key?(name)
+
+        into[name] = graphql
+        fields.each_value { |field| field.graphql_schemas(into) }
+        into
+      end
+
       # Project this schema into a Sorbet RBI class declaration — the RBI sibling
       # of #rbs, for Sorbet-typed codebases. Prefer the bundled Tapioca DSL
       # compiler (auto-discovered by `tapioca dsl`) for Sorbet projects; this is

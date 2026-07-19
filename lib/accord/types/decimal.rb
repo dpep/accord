@@ -59,6 +59,12 @@ module Accord
         "BigDecimal"
       end
 
+      # No GraphQL decimal scalar exists — and Float would lose precision — so a
+      # decimal travels as its canonical String (matching #dump).
+      def graphql
+        "String"
+      end
+
       private
 
       def coerce(value, strict:)
