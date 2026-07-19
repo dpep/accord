@@ -6,17 +6,7 @@ require_relative "fields/scalar"
 require_relative "fields/object"
 require_relative "fields/array"
 require_relative "fields/money"
-require_relative "types/string"
-require_relative "types/uuid"
-require_relative "types/iso_currency"
-require_relative "types/boolean"
-require_relative "types/integer"
-require_relative "types/date"
-require_relative "types/datetime"
-require_relative "types/decimal"
-require_relative "types/currency"
-require_relative "types/duration"
-require_relative "types/percentage"
+require_relative "types"
 
 module Accord
   # A schema is the source of truth for an API boundary. The class declares the
@@ -38,6 +28,10 @@ module Accord
   #
   # Validation is declared in field blocks — see Field::Configurator.
   class Schema
+    # Keyword options consumed by the field itself; every other keyword on a
+    # scalar DSL call is forwarded to the type's constructor.
+    FIELD_OPTIONS = %i[required default description example].freeze
+
     class << self
       def fields
         @fields ||= {}
@@ -50,51 +44,15 @@ module Accord
         subclass.instance_variable_set(:@fields, fields.dup)
       end
 
-      # Every scalar DSL method takes positional validator flags after the name
-      # (no-arg validators like :required, :positive), keyword type options, and
-      # an optional field block:  string :name, :required do length 1..100 end
-      def string(name, *flags, **opts, &block)
-        field(name, Types::String.new, *flags, **opts, &block)
-      end
-
-      def uuid(name, *flags, version: nil, **opts, &block)
-        field(name, Types::UUID.new(version:), *flags, **opts, &block)
-      end
-
-      def iso_currency(name, *flags, **opts, &block)
-        field(name, Types::ISOCurrency.new, *flags, **opts, &block)
-      end
-
-      def boolean(name, *flags, **opts, &block)
-        field(name, Types::Boolean.new, *flags, **opts, &block)
-      end
-
-      def integer(name, *flags, **opts, &block)
-        field(name, Types::Integer.new, *flags, **opts, &block)
-      end
-
-      def date(name, *flags, formats: [], **opts, &block)
-        field(name, Types::Date.new(formats:), *flags, **opts, &block)
-      end
-
-      def datetime(name, *flags, formats: [], **opts, &block)
-        field(name, Types::DateTime.new(formats:), *flags, **opts, &block)
-      end
-
-      def decimal(name, *flags, scale: Types::Decimal::DEFAULT_SCALE, round: false, **opts, &block)
-        field(name, Types::Decimal.new(scale:, round:), *flags, **opts, &block)
-      end
-
-      def currency(name, *flags, scale: 2, round: false, **opts, &block)
-        field(name, Types::Currency.new(scale:, round:), *flags, **opts, &block)
-      end
-
-      def duration(name, *flags, unit: :hours, scale: 2, round: false, **opts, &block)
-        field(name, Types::Duration.new(unit:, scale:, round:), *flags, **opts, &block)
-      end
-
-      def percentage(name, *flags, scale: 2, round: false, **opts, &block)
-        field(name, Types::Percentage.new(scale:, round:), *flags, **opts, &block)
+      # Define a scalar DSL method for a registered type name (called for each
+      # built-in at load, and by Accord::Types.register for custom types). Each
+      # takes positional validator flags after the name, keyword type options,
+      # and an optional field block:  string :name, :required do length 1..100 end
+      def define_type_dsl(type_name)
+        define_singleton_method(type_name) do |name, *flags, **opts, &block|
+          type = Types.build(type_name, **opts.except(*FIELD_OPTIONS))
+          register_field(ScalarField.new(name:, type:, **opts.slice(*FIELD_OPTIONS)), flags, &block)
+        end
       end
 
       # A nested schema. The parsed value is a sub-schema instance.
@@ -249,4 +207,8 @@ module Accord
       self
     end
   end
+
+  # Generate the scalar DSL methods from the registered built-in types. Custom
+  # types registered later add their own via Accord::Types.register.
+  Types.names.each { |name| Schema.define_type_dsl(name) }
 end
