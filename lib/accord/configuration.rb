@@ -11,10 +11,11 @@ module Accord
   # default is non-strict — an API boundary tolerates and reports; strict is
   # the trusted-internal-caller mode.
   class Configuration
-    attr_accessor :strict
+    attr_accessor :strict, :default_currency
 
     def initialize
       @strict = false
+      @default_currency = nil
     end
   end
 end

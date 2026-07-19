@@ -192,5 +192,81 @@ module Accord
         end
       end
     end
+
+    # Wraps a registered `|value, collector|` block as a named validator.
+    class BlockValidator < Base
+      attr_reader :name
+
+      def initialize(name, block)
+        @name = name
+        @block = block
+      end
+
+      def validate(value, collector)
+        @block.call(value, collector)
+      end
+    end
+
+    # Maps validator names to a class (built with the DSL args) or a
+    # `|value, collector|` block. The field-block DSL and positional flags
+    # resolve names through here, so users can add their own standard validators.
+    #
+    #   Accord::Validators.register(:even) { |v, c| c.add(:odd) unless v.even? }
+    #   Accord::Validators.register(:iban, IbanValidator)
+    class Registry
+      def initialize
+        @factories = {}
+      end
+
+      def register(name, klass = nil, &block)
+        raise ArgumentError, "provide a validator class or block" unless klass || block
+
+        @factories[name.to_sym] = klass || block
+        self
+      end
+
+      def registered?(name)
+        @factories.key?(name.to_sym)
+      end
+
+      def build(name, *args)
+        entry = @factories.fetch(name.to_sym) { raise ArgumentError, "unknown validator: #{name}" }
+        entry.is_a?(Class) ? entry.new(*args) : BlockValidator.new(name.to_sym, entry)
+      end
+
+      def names
+        @factories.keys
+      end
+
+      def clear
+        @factories.clear
+        self
+      end
+
+      def reset
+        clear
+        BUILTINS.each { |name, klass| register(name, klass) }
+        self
+      end
+    end
+
+    BUILTINS = {
+      required: Required, positive: Positive, negative: Negative, non_zero: NonZero,
+      min: Min, max: Max, between: Between, length: Length,
+      inclusion: Inclusion, exclusion: Exclusion, format: Format,
+    }.freeze
+
+    class << self
+      def registry
+        @registry ||= Registry.new.reset
+      end
+
+      def register(...) = registry.register(...)
+      def registered?(name) = registry.registered?(name)
+      def build(name, *args) = registry.build(name, *args)
+      def names = registry.names
+      def clear = registry.clear
+      def reset = registry.reset
+    end
   end
 end

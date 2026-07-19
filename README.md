@@ -92,8 +92,15 @@ decimal :exchange_rate, scale: 8  # BigDecimal, scale 8
 class Payroll < Accord::Schema
   money :salary                                # nested: { amount:, currency: }
   money :bonus, format: :flat                  # flat: bonus + bonus_currency siblings
-  money :stipend, currency: "USD"              # fixed currency, amount only
+  money :stipend, currency: "USD"              # fixed currency (input ignored)
+  money :fee, default_currency: "USD"          # currency optional, defaults to USD, input overrides
 end
+```
+
+A **default currency** (per-field `default_currency:` or the global `Accord.config.default_currency`) makes money polymorphic: a bare amount is that currency, and an explicit currency overrides. `currency:` instead locks the currency.
+
+```ruby
+Accord.configure { |c| c.default_currency = "USD" }
 
 Payroll.parse(salary: { amount: "1234.50", currency: "usd" }).salary
 # => #<Money fractional:123450 currency:USD>
@@ -157,8 +164,7 @@ Validation is declarative — rules are declared in field blocks and produce str
 
 ```ruby
 class CreateEmployee < Accord::Schema
-  string :name do
-    required
+  string :name, :required do
     length 1..100
   end
 
@@ -166,9 +172,8 @@ class CreateEmployee < Accord::Schema
     between 18..120
   end
 
-  currency :salary do
-    positive
-    validate(:increment) { |v| error(:bad_increment) unless (v % 100).zero? }  # custom inline
+  currency :salary, :positive do
+    validate { |v| error(:bad_increment) unless (v % 100).zero? }  # custom inline
   end
 
   string :status do
@@ -177,7 +182,16 @@ class CreateEmployee < Accord::Schema
 end
 ```
 
-Built-in validators: `required`, `min`, `max`, `between`, `positive`, `negative`, `non_zero`, `length`, `inclusion`, `exclusion`, `format`. Custom rules are inline `validate` blocks or reusable `Accord::Validators::Base` subclasses (`validator MyValidator`). Validators are introspectable (`CreateEmployee.fields[:salary].validators`) and contribute OpenAPI (`between 0..100` → `minimum`/`maximum`, `length 1..50` → `minLength`/`maxLength`, `inclusion [...]` → `enum`).
+Built-in validators: `required`, `min`, `max`, `between`, `positive`, `negative`, `non_zero`, `length`, `inclusion`, `exclusion`, `format`. No-arg validators can also be given as **positional flags** (`string :name, :required, :positive`). Custom rules are inline `validate` blocks (name optional) or reusable `Accord::Validators::Base` subclasses (`validator MyValidator`).
+
+Validators live in a **registry**, so built-ins and your own are added the same way and usable by name in any field block:
+
+```ruby
+Accord::Validators.register(:even) { |value, collector| collector.add(:odd) unless value.even? }
+# ... then:  integer :count do even end
+```
+
+Validators are introspectable (`CreateEmployee.fields[:salary].validators`) and contribute OpenAPI (`between 0..100` → `minimum`/`maximum`, `length 1..50` → `minLength`/`maxLength`, `inclusion [...]` → `enum`).
 
 ## Errors
 

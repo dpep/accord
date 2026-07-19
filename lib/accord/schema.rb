@@ -49,68 +49,78 @@ module Accord
         subclass.instance_variable_set(:@fields, fields.dup)
       end
 
-      def string(name, **opts, &block)
-        field(name, Types::String.new, **opts, &block)
+      # Every scalar DSL method takes positional validator flags after the name
+      # (no-arg validators like :required, :positive), keyword type options, and
+      # an optional field block:  string :name, :required do length 1..100 end
+      def string(name, *flags, **opts, &block)
+        field(name, Types::String.new, *flags, **opts, &block)
       end
 
-      def uuid(name, version: nil, **opts, &block)
-        field(name, Types::UUID.new(version:), **opts, &block)
+      def uuid(name, *flags, version: nil, **opts, &block)
+        field(name, Types::UUID.new(version:), *flags, **opts, &block)
       end
 
-      def iso_currency(name, **opts, &block)
-        field(name, Types::ISOCurrency.new, **opts, &block)
+      def iso_currency(name, *flags, **opts, &block)
+        field(name, Types::ISOCurrency.new, *flags, **opts, &block)
       end
 
-      def boolean(name, **opts, &block)
-        field(name, Types::Boolean.new, **opts, &block)
+      def boolean(name, *flags, **opts, &block)
+        field(name, Types::Boolean.new, *flags, **opts, &block)
       end
 
-      def integer(name, **opts, &block)
-        field(name, Types::Integer.new, **opts, &block)
+      def integer(name, *flags, **opts, &block)
+        field(name, Types::Integer.new, *flags, **opts, &block)
       end
 
-      def date(name, formats: [], **opts, &block)
-        field(name, Types::Date.new(formats:), **opts, &block)
+      def date(name, *flags, formats: [], **opts, &block)
+        field(name, Types::Date.new(formats:), *flags, **opts, &block)
       end
 
-      def decimal(name, scale: Types::Decimal::DEFAULT_SCALE, round: false, **opts, &block)
-        field(name, Types::Decimal.new(scale:, round:), **opts, &block)
+      def decimal(name, *flags, scale: Types::Decimal::DEFAULT_SCALE, round: false, **opts, &block)
+        field(name, Types::Decimal.new(scale:, round:), *flags, **opts, &block)
       end
 
-      def currency(name, scale: 2, round: false, **opts, &block)
-        field(name, Types::Currency.new(scale:, round:), **opts, &block)
+      def currency(name, *flags, scale: 2, round: false, **opts, &block)
+        field(name, Types::Currency.new(scale:, round:), *flags, **opts, &block)
       end
 
-      def duration(name, unit: :hours, scale: 2, round: false, **opts, &block)
-        field(name, Types::Duration.new(unit:, scale:, round:), **opts, &block)
+      def duration(name, *flags, unit: :hours, scale: 2, round: false, **opts, &block)
+        field(name, Types::Duration.new(unit:, scale:, round:), *flags, **opts, &block)
       end
 
-      def percentage(name, scale: 2, round: false, **opts, &block)
-        field(name, Types::Percentage.new(scale:, round:), **opts, &block)
+      def percentage(name, *flags, scale: 2, round: false, **opts, &block)
+        field(name, Types::Percentage.new(scale:, round:), *flags, **opts, &block)
       end
 
       # A nested schema. The parsed value is a sub-schema instance.
       #   object :address, Address
-      def object(name, schema, **opts, &block)
-        register(ObjectField.new(name:, schema:, **opts).configure(&block))
+      def object(name, schema, *flags, **opts, &block)
+        register_field(ObjectField.new(name:, schema:, **opts), flags, &block)
       end
 
       # A list of nested schemas. Each element is parsed through `schema`.
       #   array :employees, Employee
-      def array(name, schema, **opts, &block)
-        register(ArrayField.new(name:, schema:, **opts).configure(&block))
+      def array(name, schema, *flags, **opts, &block)
+        register_field(ArrayField.new(name:, schema:, **opts), flags, &block)
       end
 
       # An amount + currency parsed into a money-gem Money value.
       #   money :salary
-      def money(name, **opts, &block)
-        register(MoneyField.new(name:, **opts).configure(&block))
+      def money(name, *flags, **opts, &block)
+        register_field(MoneyField.new(name:, **opts), flags, &block)
       end
 
       # Declare a scalar field backed by a Type. Public so custom types can be
-      # registered directly. An optional block configures validators.
-      def field(name, type, **opts, &block)
-        register(ScalarField.new(name:, type:, **opts).configure(&block))
+      # registered directly. Positional flags and a block configure validators.
+      def field(name, type, *flags, **opts, &block)
+        register_field(ScalarField.new(name:, type:, **opts), flags, &block)
+      end
+
+      # Attach positional validator flags and a field block, then register.
+      def register_field(field, flags, &block)
+        flags.each { |flag| field.add_validator(Validators.build(flag)) }
+        field.configure(&block)
+        register(field)
       end
 
       # Register a field and define its reader.

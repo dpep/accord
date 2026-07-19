@@ -14,15 +14,22 @@ module Accord
   #
   #   money :salary                                  # nested { amount:, currency: }
   #   money :salary, format: :flat                   # salary: "..", salary_currency: ".."
-  #   money :salary, currency: "USD"                 # fixed currency, amount only
+  #   money :salary, currency: "USD"                 # fixed currency, amount only (input ignored)
+  #   money :salary, default_currency: "USD"         # currency optional, defaults to USD, input overrides
   #   money :salary, format: :flat, currency_field: :ccy   # aliased currency key
+  #
+  # A default currency (per-field `default_currency:` or the global
+  # `Accord.config.default_currency`) makes the currency optional and
+  # polymorphic: a bare amount is that currency, and an explicit currency
+  # overrides. `currency:` (fixed) instead locks the currency and ignores input.
   #
   # Dump always emits the canonical nested { amount:, currency: } form,
   # regardless of the input format.
   class MoneyField < Field
     FORMATS = %i[nested flat].freeze
 
-    def initialize(format: :nested, currency: nil, round: false, amount_field: nil, currency_field: nil, **opts)
+    def initialize(format: :nested, currency: nil, default_currency: nil, round: false,
+                   amount_field: nil, currency_field: nil, **opts)
       super(**opts)
       Accord.require_money!
       raise ArgumentError, "unknown money format: #{format.inspect}" unless FORMATS.include?(format)
@@ -32,8 +39,11 @@ module Accord
       @amount_type = Types::Decimal.new # representative instance for OpenAPI (scale-independent)
       @currency_type = Types::ISOCurrency.new
       @fixed_currency = currency ? @currency_type.parse!(currency) : nil
+      @field_default_currency = default_currency ? @currency_type.parse!(default_currency) : nil
       @amount_name = amount_key(amount_field)
-      @currency = ScalarField.new(name: currency_key(currency_field), type: @currency_type, required: true)
+      # Currency is always optional at the component level; required-when-no-default
+      # is enforced in #resolve_currency so the global default can apply.
+      @currency = ScalarField.new(name: currency_key(currency_field), type: @currency_type)
     end
 
     # Resolve against the full input — flat format sources the amount and
@@ -105,7 +115,25 @@ module Accord
     def resolve_currency(input, strict:, path:)
       return Result.ok(@fixed_currency) if @fixed_currency
 
-      @currency.resolve(input, strict:, path:)
+      result = @currency.resolve(input, strict:, path:)
+      # Present (valid or invalid) input wins — an explicit currency overrides.
+      return result unless result.value.nil? && result.errors.empty?
+
+      # Absent: fall back to the default currency, else the currency is required.
+      default = default_currency
+      return Result.ok(default) if default
+      raise MissingField, @currency.name if strict
+
+      currency_path = path + [@currency.name]
+      Accord.instrument(:required, field: @currency.name, path: currency_path)
+      Result.failed(Error.new(path: currency_path, field: @currency.name, code: :required))
+    end
+
+    def default_currency
+      return @field_default_currency if @field_default_currency
+
+      configured = Accord.config.default_currency
+      configured && @currency_type.parse!(configured)
     end
 
     # A Decimal whose scale matches the resolved currency's subunit precision

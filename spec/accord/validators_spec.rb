@@ -171,4 +171,59 @@ RSpec.describe "validation framework" do
       expect(s.fields[:currency].openapi).to include(enum: %w[USD EUR GBP])
     end
   end
+
+  describe "the validator registry" do
+    after { Accord::Validators.reset }
+
+    it "registers the built-ins through the same mechanism" do
+      expect(Accord::Validators.registered?(:positive)).to be(true)
+      expect(Accord::Validators.registered?(:between)).to be(true)
+    end
+
+    it "lets users register their own validator, usable in a field block" do
+      Accord::Validators.register(:even) { |value, collector| collector.add(:odd) unless value.even? }
+      s = schema { integer(:count) { even } }
+
+      error = s.parse({ count: "3" }).errors.first
+      expect(error.code).to eq(:odd)
+      expect(error.validator).to eq(:even)
+    end
+
+    it "supports clear and reset" do
+      Accord::Validators.clear
+      expect(Accord::Validators.registered?(:positive)).to be(false)
+
+      Accord::Validators.reset
+      expect(Accord::Validators.registered?(:positive)).to be(true)
+    end
+  end
+
+  describe "an unnamed custom validate block" do
+    it "defaults the validator name to :custom" do
+      s = schema do
+        currency(:salary) do
+          validate { |v| error(:bad_increment) unless (v % 100).zero? }
+        end
+      end
+
+      error = s.parse({ salary: "150" }).errors.first
+      expect(error.code).to eq(:bad_increment)
+      expect(error.validator).to eq(:custom)
+    end
+  end
+
+  describe "positional validator flags" do
+    it "adds a validator from a positional symbol" do
+      s = schema { string(:name, :required) }
+
+      expect(s.fields[:name].required?).to be(true)
+      expect(s.parse({}).errors.map(&:code)).to eq([:required])
+    end
+
+    it "combines multiple flags with a block" do
+      s = schema { integer(:n, :positive, :non_zero) { max 100 } }
+
+      expect(s.parse({ n: "0" }).errors.map(&:code)).to contain_exactly(:not_positive, :zero)
+    end
+  end
 end

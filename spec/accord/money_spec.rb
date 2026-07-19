@@ -107,6 +107,42 @@ RSpec.describe "money type" do
     end
   end
 
+  describe "default currency" do
+    it "makes currency optional with a per-field default, overridable by input" do
+      schema = Class.new(Accord::Schema) { money :salary, default_currency: "USD" }
+
+      expect(schema.parse({ salary: { amount: "10.00" } }).salary)
+        .to eq(Money.from_amount(BigDecimal("10.00"), "USD"))
+      expect(schema.parse({ salary: { amount: "10.00", currency: "EUR" } }).salary)
+        .to eq(Money.from_amount(BigDecimal("10.00"), "EUR"))
+    end
+
+    it "honors a global default currency" do
+      previous = Accord.config.default_currency
+      Accord.configure { |c| c.default_currency = "USD" }
+      schema = Class.new(Accord::Schema) { money :salary }
+
+      expect(schema.parse({ salary: { amount: "10.00" } }).salary)
+        .to eq(Money.from_amount(BigDecimal("10.00"), "USD"))
+    ensure
+      Accord.config.default_currency = previous
+    end
+
+    it "still requires currency when no default is set" do
+      schema = Class.new(Accord::Schema) { money :salary }
+
+      expect(schema.parse({ salary: { amount: "10.00" } }).errors.map(&:path))
+        .to include([:salary, :currency])
+    end
+
+    it "reports an explicitly invalid currency rather than defaulting" do
+      schema = Class.new(Accord::Schema) { money :salary, default_currency: "USD" }
+
+      expect(schema.parse({ salary: { amount: "10.00", currency: "nope" } }).errors.map(&:path))
+        .to include([:salary, :currency])
+    end
+  end
+
   describe "fixed currency" do
     let(:schema) do
       Class.new(Accord::Schema) do

@@ -170,41 +170,43 @@ module Accord
       [sub, sub.errors]
     end
 
-    # The field-block DSL. Each method registers a declarative validator on the
-    # field; `validate`/`validator` add custom rules.
+    # The field-block DSL. Any registered validator name is a method here
+    # (resolved through Accord::Validators), so built-ins and user-registered
+    # validators work identically; `validate`/`validator` add custom rules.
     #
     #   currency :salary do
     #     positive
-    #     validate(:increment) { |v| error(:bad) unless (v % 100).zero? }
+    #     validate { |v| error(:bad) unless (v % 100).zero? }   # name optional
     #   end
     class Configurator
+      # Route to the registry rather than Kernel#format.
+      undef_method :format
+
       def initialize(field)
         @field = field
       end
 
-      def required
-        @field.add_validator(Validators::Required.new) unless @field.required?
-      end
-
-      def positive = @field.add_validator(Validators::Positive.new)
-      def negative = @field.add_validator(Validators::Negative.new)
-      def non_zero = @field.add_validator(Validators::NonZero.new)
-      def min(value) = @field.add_validator(Validators::Min.new(value))
-      def max(value) = @field.add_validator(Validators::Max.new(value))
-      def between(range) = @field.add_validator(Validators::Between.new(range))
-      def length(range) = @field.add_validator(Validators::Length.new(range))
-      def inclusion(values) = @field.add_validator(Validators::Inclusion.new(values))
-      def exclusion(values) = @field.add_validator(Validators::Exclusion.new(values))
-      def format(pattern) = @field.add_validator(Validators::Format.new(pattern))
-
-      # Custom inline rule: validate(:code) { |value| error(:x) unless ... }
-      def validate(name, &block)
+      # Custom inline rule. The name (default :custom) tags the resulting error's
+      # validator; error codes come from the block's `error(:code)` calls.
+      def validate(name = :custom, &block)
         @field.add_validator(Validators::Custom.new(name, block))
       end
 
       # Reusable validator: a Validators::Base subclass or instance.
       def validator(validator)
         @field.add_validator(validator.is_a?(Class) ? validator.new : validator)
+      end
+
+      private
+
+      def method_missing(name, *args)
+        return super unless Validators.registered?(name)
+
+        @field.add_validator(Validators.build(name, *args))
+      end
+
+      def respond_to_missing?(name, include_private = false)
+        Validators.registered?(name) || super
       end
     end
   end
