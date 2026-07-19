@@ -33,6 +33,20 @@ module Accord
     GRAPHQL_INPUT_NAME = "MoneyInput"
     GRAPHQL_INPUT = "input MoneyInput {\n  amount: String!\n  currency: String!\n}"
 
+    # Declarative config, introspectable like every other field: the wire
+    # `format` (:nested/:flat), a locked `fixed_currency` (or nil), and the
+    # field-level `default_currency` (or nil — the global default isn't part of
+    # the field's own declaration).
+    attr_reader :format, :fixed_currency
+
+    def round?
+      @round
+    end
+
+    def default_currency
+      @field_default_currency
+    end
+
     def initialize(format: :nested, currency: nil, default_currency: nil, round: false,
                    amount_field: nil, currency_field: nil, **opts)
       super(**opts)
@@ -124,7 +138,7 @@ module Accord
       return result unless result.value.nil? && result.errors.empty?
 
       # Absent: fall back to the default currency, else the currency is required.
-      default = default_currency
+      default = effective_default_currency
       return Result.ok(default) if default
       raise MissingField, @currency.name if strict
 
@@ -133,7 +147,10 @@ module Accord
       Result.failed(Error.new(path: currency_path, field: @currency.name, code: :required))
     end
 
-    def default_currency
+    # The currency actually applied when input omits one: the field default, else
+    # the global default. (The declared field default alone is the public
+    # #default_currency reader.)
+    def effective_default_currency
       return @field_default_currency if @field_default_currency
 
       configured = Accord.config.default_currency

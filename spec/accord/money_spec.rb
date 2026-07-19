@@ -195,4 +195,22 @@ RSpec.describe "money type" do
       expect(schema[:required]).to contain_exactly(:amount, :currency)
     end
   end
+
+  describe "introspection" do
+    it "exposes its declarative config like any other field" do
+      field = Accord::MoneyField.new(name: :salary, format: :flat, currency: "usd", round: true)
+
+      expect(field.format).to eq(:flat)
+      expect(field.fixed_currency).to eq("USD")
+      expect(field.round?).to be(true)
+      expect(field.default_currency).to be_nil
+    end
+
+    it "reports the declared field-level default currency" do
+      field = Accord::MoneyField.new(name: :salary, default_currency: "eur")
+
+      expect(field.default_currency).to eq("EUR")
+      expect(field.fixed_currency).to be_nil
+    end
+  end
 end
