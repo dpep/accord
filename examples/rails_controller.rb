@@ -2,8 +2,8 @@
 
 # Illustrative Rails setup — copy the pieces into a real app (this file needs
 # Rails to run). It shows the full controller flow: typed input via the `accord`
-# macro, automatic 422s, a custom error format, and query-param filters.
-# See docs/rails.md for the narrated version.
+# macro (named, inline, and scoped sources), defaults, automatic 422s, and a
+# custom error format. See docs/rails.md for the narrated version.
 
 # --- Gemfile -----------------------------------------------------------------
 #
@@ -14,21 +14,16 @@
 
 class CreateEmployee < Accord::Schema
   string   :name, :required
-  string   :email, :required do
-    format(/\A[^@\s]+@[^@\s]+\z/)
-  end
   currency :salary, :positive
-  boolean  :active, default: true
+  boolean  :active, default: true        # default: absent input -> true
+  string   :role, default: "member"      # default: absent input -> "member"
   date     :hired_on
-end
 
-# --- app/schemas/employee_filters.rb -----------------------------------------
-
-class EmployeeFilters < Accord::Schema
-  string  :department
-  boolean :active
-  integer :min_salary do
-    min 0
+  # Block form: reach for it when a field needs several rules or a custom check.
+  # (The keyword shorthand — `format:`, `length:`, ... — covers the simple ones.)
+  string :email, :required do
+    format(/\A[^@\s]+@[^@\s]+\z/)
+    length 5..255
   end
 end
 
@@ -40,9 +35,7 @@ class ApplicationController < ActionController::API
   # Override the default 422 body once, app-wide. `error.errors` is an array of
   # structured Accord::Error — render whatever shape your clients expect.
   def render_accord_errors(error)
-    grouped = error.errors.group_by(&:field).transform_values do |errs|
-      errs.map(&:code)
-    end
+    grouped = error.errors.group_by(&:field).transform_values { |errs| errs.map(&:code) }
     render json: { errors: grouped }, status: :unprocessable_entity
   end
 end
@@ -50,33 +43,29 @@ end
 # --- app/controllers/employees_controller.rb ---------------------------------
 
 class EmployeesController < ApplicationController
-  # Lazily-parsed, memoized readers. Declaring several is free; each action uses
-  # whichever it needs. `from:` scopes the source (defaults to `params`).
-  accord :employee, CreateEmployee
-  accord :filters,  EmployeeFilters, from: -> { params.fetch(:q, {}) }
-
-  # A block defines the schema inline — handy for a simple, single-use input
-  # that doesn't warrant its own class. (Named classes still win when you want
-  # reuse, isolated tests, or an OpenAPI/RBS/GraphQL projection.)
-  accord :search, from: -> { params.fetch(:q, {}) } do
+  # An inline schema for a simple, single-use input. `from: :q` names a params
+  # key (Symbol); nil reads all of `params`, a proc handles anything else.
+  accord :search, from: :q do
     string  :name
     boolean :active
   end
 
+  # A proc reaches a source a single key can't — here a JSON:API body whose
+  # attributes are nested under data/attributes.
+  accord :employee, CreateEmployee, from: -> { params.dig(:data, :attributes) }
+
   # POST /employees
-  #   { "name": "Ada", "email": "ada@example.com", "salary": "$65,000" }
-  # -> 201, or 422 { "errors": { "salary": ["not_positive"] } } if invalid.
+  #   { "data": { "attributes": { "name": "Ada", "email": "ada@x.co", "salary": "$65,000" } } }
+  # -> 201 (active defaults to true, role to "member"), or 422 if invalid.
   def create
-    record = Employee.create!(employee.to_h)   # `employee` is typed; raises 422 if invalid
-    render json: record, status: :created
+    render json: Employee.create!(employee.to_h), status: :created  # typed; 422 if invalid
   end
 
-  # GET /employees?q[active]=true&q[min_salary]=50000
+  # GET /employees?q[name]=ada&q[active]=true
   def index
     scope = Employee.all
-    scope = scope.where(department: filters.department) if filters.department
-    scope = scope.where(active: filters.active)         unless filters.active.nil?
-    scope = scope.where("salary >= ?", filters.min_salary) if filters.min_salary
+    scope = scope.where("name ILIKE ?", "%#{search.name}%") if search.name
+    scope = scope.where(active: search.active)              unless search.active.nil?
     render json: scope
   end
 end
@@ -88,5 +77,7 @@ end
 # * Invalid input raises Accord::InvalidInput, rendered as a 422 by a
 #   rescue_from installed when the concern is included. The action body never
 #   runs on bad input.
+# * The inline `search` schema is named `EmployeesController::SearchInput`, so it
+#   still projects to OpenAPI/RBS/RBI like a top-level schema class.
 # * Observability: subscribe to `accord.parse.*` ActiveSupport notifications to
 #   track malformed-input rates (great during an API migration).

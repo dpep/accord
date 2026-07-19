@@ -20,9 +20,11 @@ module Accord
   #
   # The macro declares a lazily-parsed, memoized reader rather than an action
   # hook, so a controller can declare several inputs and each action uses
-  # whichever it needs. `from:` scopes the source (defaults to `params`):
+  # whichever it needs. `from:` scopes the source (defaults to `params`) — a
+  # Symbol names a params key, a proc handles anything else:
   #
-  #     accord :filters, EmployeeFilters, from: -> { params[:q] }
+  #     accord :filters, EmployeeFilters, from: :q
+  #     accord :employee, CreateEmployee, from: -> { params.dig(:data, :attributes) }
   #
   # The schema is itself the allowlist — it reads only its declared fields via
   # `[]`/`key?`, which ActionController::Parameters permits without `permit` —
@@ -53,12 +55,24 @@ module Accord
         if block
           raise ArgumentError, "accord :#{name} takes a schema or a block, not both" if schema
 
-          schema = Class.new(Schema, &block)
+          schema = define_inline_schema(name, &block)
         elsif schema.nil?
           raise ArgumentError, "accord :#{name} requires a schema class or a block"
         end
 
         define_method(name) { accord_input(name, schema, from) }
+      end
+
+      private
+
+      # Build an anonymous schema from a block and name it as a controller
+      # constant (`:employee` -> `EmployeeInput`), so it projects to OpenAPI/RBS/
+      # RBI/GraphQL like a top-level schema class. The `Input` suffix avoids
+      # shadowing a same-named model constant inside the controller.
+      def define_inline_schema(name, &block)
+        const = "#{name.to_s.split(/[^a-zA-Z0-9]+/).map(&:capitalize).join}Input"
+        remove_const(const) if const_defined?(const, false)
+        const_set(const, Class.new(Schema, &block))
       end
     end
 
@@ -73,8 +87,18 @@ module Accord
       @accord_inputs ||= {}
       return @accord_inputs[name] if @accord_inputs.key?(name)
 
-      source = from ? instance_exec(&from) : params
-      @accord_inputs[name] = schema.parse!(source)
+      @accord_inputs[name] = schema.parse!(accord_source(from))
+    end
+
+    # Resolve the raw input for a declared schema. `from:` is a params key
+    # (Symbol) for the common nested case, or a proc (evaluated in controller
+    # context) for anything a single key can't express; nil reads `params`.
+    def accord_source(from)
+      case from
+      when nil    then params
+      when Symbol then params[from]
+      else instance_exec(&from)
+      end
     end
   end
 end

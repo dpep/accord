@@ -109,20 +109,20 @@ end
 
 - **Lazy** — the schema parses on first access, so declaring an input costs nothing in actions that don't use it.
 - **Memoized** — accessing `employee` twice parses once.
-- **`from:`** — a proc, evaluated in controller context, that scopes the source (defaults to `params`). Use it for nested payloads (`params[:employee]`) or query strings (`params[:q]`).
+- **`from:`** — scopes the source (defaults to all of `params`). A **Symbol** names a params key (`from: :q` → `params[:q]`) for the common nested case; a **proc**, evaluated in controller context, handles anything a single key can't (`from: -> { params.dig(:data, :attributes) }`).
 
 ### Inline schemas
 
-Pass a block instead of a schema class to define an anonymous schema right in the controller — handy for a simple, single-use input that doesn't warrant its own file:
+Pass a block instead of a schema class to define a schema right in the controller — handy for a simple, single-use input that doesn't warrant its own file:
 
 ```ruby
-accord :search, from: -> { params.fetch(:q, {}) } do
+accord :search, from: :q do
   string  :name
   boolean :active
 end
 ```
 
-Reach for a named schema class when you want reuse across controllers, isolated schema tests, or an OpenAPI/RBS/GraphQL projection — those need a named schema, and an inline one is anonymous. `accord` requires exactly one of a schema class or a block.
+The inline schema is named as a controller constant (`:search` → `SearchController::SearchInput`), so it still projects to OpenAPI/RBS/RBI. Reach for a top-level named class when you want reuse across controllers or isolated schema tests. `accord` requires exactly one of a schema class or a block.
 
 Eager validation (fail before the action body) is just a `before_action`:
 

@@ -4,24 +4,26 @@ Validation in Accord is **declarative**: rules are metadata on a field, not impe
 
 ## Declaring validators
 
-Two equivalent ways to attach a validator, plus a block for the rest:
+Three ways to attach a validator — pick whichever reads best:
 
 ```ruby
 class CreateEmployee < Accord::Schema
   # positional flags — no-arg validators as symbols after the name
   string :name, :required
 
-  # a block — for validators that take arguments
-  integer :age do
-    between 18..120
-  end
+  # keyword shorthand — validators that take one argument, inline
+  integer :age, between: 18..120
+  string  :email, format: /@/
 
-  # combine both
+  # a block — for several rules on one field, or a custom check
   currency :salary, :required, :positive do
     max 1_000_000
+    validate(:increment) { |v| error(:round_hundreds) unless (v % 100).zero? }
   end
 end
 ```
+
+The keyword form takes any registered validator name (`format:`, `between:`, `length:`, `inclusion:`, `min:`, `max:`, ...) with its argument; a keyword matching a field option (`required:`, `default:`) stays a field option. Reach for a block when a field needs multiple rules or a custom `validate`.
 
 ## The lifecycle
 

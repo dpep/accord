@@ -45,13 +45,26 @@ module Accord
       end
 
       # Define a scalar DSL method for a registered type name (called for each
-      # built-in at load, and by Accord::Types.register for custom types). Each
-      # takes positional validator flags after the name, keyword type options,
-      # and an optional field block:  string :name, :required do length 1..100 end
+      # built-in at load, and by Accord::Types.register for custom types). After
+      # the name come positional validator flags, then keyword options, then an
+      # optional field block. Keywords are routed three ways:
+      #   - field options (required/default/description/example) -> the field
+      #   - registered validator names (format:/between:/length:/...) -> validators
+      #   - anything else -> the type constructor (e.g. scale: on decimal)
+      # so all three forms compose:
+      #   string  :name, :required, length: 1..100
+      #   string  :email, format: /@/
+      #   decimal :price, scale: 2, between: 0..1000 do positive end
       def define_type_dsl(type_name)
         define_singleton_method(type_name) do |name, *flags, **opts, &block|
-          type = Types.build(type_name, **opts.except(*FIELD_OPTIONS))
-          register_field(ScalarField.new(name:, type:, **opts.slice(*FIELD_OPTIONS)), flags, &block)
+          field_opts = opts.slice(*FIELD_OPTIONS)
+          # Field options win over same-named validators (e.g. `required:`).
+          validator_opts = opts.except(*FIELD_OPTIONS).select { |key, _| Validators.registered?(key) }
+          type_opts = opts.except(*FIELD_OPTIONS, *validator_opts.keys)
+
+          field = ScalarField.new(name:, type: Types.build(type_name, **type_opts), **field_opts)
+          validator_opts.each { |vname, arg| field.add_validator(Validators.build(vname, arg)) }
+          register_field(field, flags, &block)
         end
       end
 

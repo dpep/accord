@@ -10,20 +10,20 @@ require_relative "../lib/accord"
 
 class Address < Accord::Schema
   string :city, :required
-  string :zip do
-    format(/\A\d{5}\z/)
-  end
+  string :zip, format: /\A\d{5}\z/
 end
 
 class CreateEmployee < Accord::Schema
   string   :name, :required
-  string   :email, :required do
-    format(/\A[^@\s]+@[^@\s]+\z/)
-  end
-  currency :salary, :positive
-  boolean  :active, default: true
+  string   :email, :required, format: /\A[^@\s]+@[^@\s]+\z/   # keyword shorthand
+  boolean  :active, default: true                             # default value
   date     :hired_on
   object   :address, Address
+
+  # Block form: for a custom rule the keyword shorthand can't express.
+  currency :salary, :positive do
+    validate(:increment) { |v| error(:round_hundreds) unless (v % 100).zero? }
+  end
 end
 
 def section(title)

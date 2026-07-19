@@ -19,9 +19,7 @@ end
 
 class LineItem < Accord::Schema
   string  :sku, :required
-  integer :quantity, :required do
-    between 1..999
-  end
+  integer :quantity, :required, between: 1..999
 end
 
 class CreateOrder < Accord::Schema

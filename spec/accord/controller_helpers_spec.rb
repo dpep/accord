@@ -69,10 +69,20 @@ RSpec.describe Accord::ControllerHelpers do
       expect(controller.employee).to be(controller.employee)
     end
 
-    it "scopes the source with from:" do
+    it "scopes the source with a proc from:" do
       input = schema
       controller_class = build_controller do
         accord :employee, input, from: -> { params[:employee] }
+      end
+      controller = controller_class.new({ employee: { name: "Ada" } })
+
+      expect(controller.employee.name).to eq("Ada")
+    end
+
+    it "scopes the source with a symbol from: (a params key)" do
+      input = schema
+      controller_class = build_controller do
+        accord :employee, input, from: :employee
       end
       controller = controller_class.new({ employee: { name: "Ada" } })
 
@@ -87,6 +97,20 @@ RSpec.describe Accord::ControllerHelpers do
       end.new({ name: "Ada" })
 
       expect(controller.employee.name).to eq("Ada")
+    end
+
+    it "names the inline schema as a controller constant so it projects" do
+      controller = build_controller
+      stub_const("SearchController", controller)
+      controller.class_eval do
+        accord :query do
+          string :term, :required
+        end
+      end
+
+      expect(SearchController::QueryInput.name).to eq("SearchController::QueryInput")
+      expect(SearchController::QueryInput.openapi[:properties]).to have_key(:term)
+      expect(SearchController::QueryInput.rbi).to include("< Accord::Schema")
     end
 
     it "requires either a schema or a block" do

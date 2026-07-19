@@ -54,4 +54,34 @@ RSpec.describe "type registry" do
     expect(schema.fields[:rate].type.scale).to eq(4)   # scale -> type
     expect(schema.fields[:rate].required?).to be(true) # required -> field
   end
+
+  describe "inline keyword validators" do
+    it "turns a registered validator keyword into a validator" do
+      schema = Class.new(Accord::Schema) do
+        string :name, format: /\A\w+\z/
+      end
+
+      expect(schema.parse({ name: "ok" })).to be_valid
+      expect(schema.parse({ name: "no spaces" })).not_to be_valid
+    end
+
+    it "composes field options, type options, and validator keywords" do
+      schema = Class.new(Accord::Schema) do
+        decimal :price, :required, scale: 2, between: 0..100
+      end
+      field = schema.fields[:price]
+
+      expect(field.type.scale).to eq(2)                                  # type option
+      expect(field.required?).to be(true)                               # field option
+      expect(field.validators.any?(Accord::Validators::Between)).to be(true) # validator keyword
+    end
+
+    it "feeds validator keywords into the OpenAPI projection" do
+      schema = Class.new(Accord::Schema) do
+        string :name, length: 1..50
+      end
+
+      expect(schema.fields[:name].openapi).to include(minLength: 1, maxLength: 50)
+    end
+  end
 end
