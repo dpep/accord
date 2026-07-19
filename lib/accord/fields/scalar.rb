@@ -33,11 +33,23 @@ module Accord
     private
 
     def coerce_present(raw, strict:, path:)
-      Result.ok(type.cast(raw, strict:))
+      value = type.cast(raw, strict:)
+      observe_permissive_coercion(raw, value, path) if !strict && Accord.observe_coercions?
+      Result.ok(value)
     rescue CoercionError => e
       raise if strict
 
       Result.failed(error(path, e.code, input: e.input))
+    end
+
+    # If the value only coerced because permissive rules accepted input that
+    # strict rules would reject, emit accord.parse.coerced — carrying the raw
+    # input (the "variant" seen) and the canonical value. When a field stops
+    # emitting these, it's safe to make it strict.
+    def observe_permissive_coercion(raw, value, path)
+      type.cast(raw, strict: true)
+    rescue CoercionError
+      Accord.instrument(:coerced, field: name, path: path + [name], input: raw, value:, type: type.type_name)
     end
   end
 end

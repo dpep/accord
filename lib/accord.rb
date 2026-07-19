@@ -55,6 +55,14 @@ module Accord
       notifier&.instrument("accord.parse.#{code}", **payload)
     end
 
+    # Whether to emit `accord.parse.coerced` when a permissive parse accepts
+    # input that strict rules would reject — the signal for narrowing permissive
+    # scope toward strict. Opt-in (it costs a strict re-check per loose field)
+    # and only active when a notifier is listening.
+    def observe_coercions?
+      config.observe_coercions && !notifier.nil?
+    end
+
     # Merge the OpenAPI component schemas of several schemas (each plus its
     # nested schemas) into one map — for an OpenAPI `components: { schemas: ... }`
     # section. See docs/openapi.md.

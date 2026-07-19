@@ -310,6 +310,36 @@ This is especially useful when migrating an existing API: run permissively, watc
 
 ---
 
+## From permissive to strict
+
+Permissive parsing is a great *starting* point — but the goal is usually to tighten toward strict, canonical input. Accord turns that into an observable, data-driven process rather than a guess.
+
+The events above (`accord.parse.<error_code>`) tell you which fields clients get **wrong**. A second signal tells you which fields still rely on **permissiveness** — i.e. which ones you *can't* make strict yet. Enable it during a migration:
+
+```ruby
+# config/initializers/accord.rb
+Accord.configure { |c| c.observe_coercions = true }
+```
+
+Now, whenever a permissive parse accepts input that strict rules would reject (`"$1,000.00"` for a currency, `"yes"` for a boolean, a legacy date format), Accord emits `accord.parse.coerced` with the raw input it saw:
+
+```ruby
+ActiveSupport::Notifications.subscribe("accord.parse.coerced") do |_name, _s, _f, _id, payload|
+  # payload => { field: :salary, path: [:salary], input: "$1,000.00", value: 0.1e4, type: :currency }
+  Rails.logger.info("[accord] permissive #{payload[:field]} <- #{payload[:input].inspect}")
+end
+```
+
+The `input` is the **variant** — so you can aggregate "which shapes is this field actually receiving?" and narrow scope gradually. The workflow:
+
+1. **Watch** — run permissively; group `accord.parse.coerced` by field, and by the distinct `input` variants each field sees.
+2. **Fix at the source** — once you know the variants (e.g. clients sending `"1,000"` and `"$1000"`), update the offending clients, or normalize upstream.
+3. **Flip when quiet** — when the events stop, that traffic is already canonical. Tighten the boundary with `parse!(params, strict: true)` (or `Accord.config.strict = true` globally). If some fields settle before others, split the settled ones into a strict sub-schema and keep the rest permissive.
+
+The signal is off by default (it costs a strict re-check per loose field) and only fires when a notifier is listening, so it's a migration tool you switch on, not steady-state overhead.
+
+---
+
 ## Testing controllers
 
 Nothing special — schemas are plain Ruby, so request/controller specs work as usual. The valuable cases are the `422` shape and coercion:
