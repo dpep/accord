@@ -112,6 +112,8 @@ end
 - **Lazy** — the schema parses on first access, so declaring an input costs nothing in actions that don't use it.
 - **Memoized** — accessing `employee` twice parses once.
 - **`from:`** — scopes the source (defaults to all of `params`). A **Symbol** names a params key (`from: :q` → `params[:q]`) for the common nested case; a **proc**, evaluated in controller context, handles anything a single key can't (`from: -> { params.dig(:data, :attributes) }`).
+- **Typed** — with Sorbet, the bundled Tapioca DSL compiler types each reader from its schema (`employee` → `CreateEmployee`, a `[Schema]` list → `T::Array[CreateEmployee]`), so `employee.salary` type-checks inside the action. Run `bundle exec tapioca dsl`.
+- **Introspectable** — the declarations live in `Controller.accord_inputs` (`{ reader_name => schema }`), e.g. to enumerate every controller's inputs for docs or an OpenAPI paths generator.
 
 ### Inline schemas
 

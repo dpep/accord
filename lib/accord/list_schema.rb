@@ -57,9 +57,14 @@ module Accord
       Result.new(items.each_with_index.map { |item, index| element.parse(item, strict:, path: path + [index]) })
     end
 
-    # Parse and raise Accord::InvalidInput unless every element is valid.
+    # Parse and return the element instances, raising Accord::InvalidInput
+    # unless every element is valid. (Non-bang #parse returns the richer Result
+    # with errors; the valid list is just its members.)
     def parse!(source, **options)
-      parse(source, **options).tap { |result| raise InvalidInput, result unless result.valid? }
+      result = parse(source, **options)
+      raise InvalidInput, result unless result.valid?
+
+      result.members
     end
 
     def openapi = @field.openapi

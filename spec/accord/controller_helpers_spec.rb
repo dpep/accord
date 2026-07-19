@@ -177,6 +177,25 @@ RSpec.describe Accord::ControllerHelpers do
       expect(ImportsController::PeopleInput.openapi[:type]).to eq("array")
     end
 
+    it "records declarations in an introspectable registry" do
+      input = schema
+      controller = build_controller do
+        accord :employee, input
+        accord :people, [input]
+      end
+
+      expect(controller.accord_inputs[:employee]).to eq(input)
+      expect(controller.accord_inputs[:people]).to be_a(Accord::ListSchema)
+    end
+
+    it "inherits declarations into a subclass" do
+      input = schema
+      parent = build_controller { accord :employee, input }
+      child = Class.new(parent)
+
+      expect(child.accord_inputs).to have_key(:employee)
+    end
+
     it "requires either a schema or a block" do
       expect { build_controller { accord :employee } }.to raise_error(ArgumentError)
     end

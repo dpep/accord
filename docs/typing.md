@@ -55,7 +55,9 @@ Accord ships a **Tapioca DSL compiler** at `lib/tapioca/dsl/compilers/accord_sch
 bundle exec tapioca dsl
 ```
 
-generates RBI for every `Accord::Schema` subclass into `sorbet/rbi/dsl/`, so Sorbet knows each reader's return type. No manual conversion, no drift — the compiler reuses the exact same type mapping as `Schema.rbs`. The file is inert unless Tapioca is present, so shipping it adds no dependency.
+generates RBI for every `Accord::Schema` subclass into `sorbet/rbi/dsl/`, so Sorbet knows each reader's return type. It also types the `parse`/`parse!` entry points as the schema (`CreateEmployee.parse!(params)` → `CreateEmployee`, no `T.let`). No manual conversion, no drift — the compiler reuses the exact same type mapping as `Schema.rbs`. The file is inert unless Tapioca is present, so shipping it adds no dependency.
+
+A second compiler (`accord_controller.rb`) types the readers the Rails `accord` macro generates — reading each controller's `accord_inputs` registry, a schema reader becomes that schema, a `[Schema]` list reader becomes `T::Array[Element]` — so typing reaches the controller, accord's home turf.
 
 ## Sorbet / RBI — standalone
 

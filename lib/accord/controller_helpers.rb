@@ -79,7 +79,16 @@ module Accord
             schema
           end
 
+        accord_inputs[name] = input
         define_method(name) { accord_input(name, input, from) }
+      end
+
+      # The inputs declared on this controller, as `{ reader_name => schema }`
+      # (a schema class, or an Accord::ListSchema for a `[Schema]` list). Fully
+      # introspectable — and the source the Tapioca controller compiler types the
+      # generated readers from. A subclass inherits its parents' declarations.
+      def accord_inputs
+        @accord_inputs ||= superclass.respond_to?(:accord_inputs) ? superclass.accord_inputs.dup : {}
       end
 
       private
@@ -113,10 +122,10 @@ module Accord
     end
 
     def accord_input(name, schema, from)
-      @accord_inputs ||= {}
-      return @accord_inputs[name] if @accord_inputs.key?(name)
+      @accord_input_cache ||= {}
+      return @accord_input_cache[name] if @accord_input_cache.key?(name)
 
-      @accord_inputs[name] = schema.parse!(accord_source(from))
+      @accord_input_cache[name] = schema.parse!(accord_source(from))
     end
 
     # Resolve the raw input for a declared schema. `from:` is a params key
