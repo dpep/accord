@@ -90,11 +90,17 @@ CreateOrder.graphql_schemas.values.join("\n\n")   # AddressInput, LineItemInput,
 RABL serializes objects **out**; Accord parses input **in**. They sit at opposite ends of a request: Accord turns untrusted params into typed values, your domain logic computes a result, and RABL renders that result. The values flow through the middle with their types intact.
 
 ```ruby
-# 1. parse untrusted input — rate is a Money, hours a BigDecimal
+class Timesheet < Accord::Schema
+  decimal :rate,  :positive, scale: 2, required: true   # $/hr, 2 decimals
+  decimal :hours, :positive, scale: 3, required: true   # hours, to the thousandth
+end
+
+# 1. parse untrusted input — rate and hours are scale-controlled BigDecimals
 timesheet = Timesheet.parse!(params)
 
-# 2. domain logic — Money * BigDecimal is still a Money (no float, no precision loss)
-paycheck = Paycheck.new(gross_pay: timesheet.rate * timesheet.hours, ...)
+# 2. domain logic — exact BigDecimal math; the amount owed is a Money, which
+#    enforces its own currency scale (USD -> 2), so 45.50 * 80.125 rounds to cents
+paycheck = Paycheck.new(gross_pay: Money.from_amount(timesheet.rate * timesheet.hours, "USD"), ...)
 
 # 3. serialize the result with RABL
 ```
@@ -102,16 +108,17 @@ paycheck = Paycheck.new(gross_pay: timesheet.rate * timesheet.hours, ...)
 ```ruby
 # app/views/paychecks/show.rabl
 object @paycheck
-attributes :period_start, :period_end
-node(:gross_pay) { |p| p.gross_pay.format }   # Money -> "$3,640.00"
+node(:rate)      { |p| "%.2f" % p.rate }      # "45.50"  (mirrors scale: 2)
+node(:hours)     { |p| "%.3f" % p.hours }     # "80.125" (mirrors scale: 3)
+node(:gross_pay) { |p| p.gross_pay.format }   # "$3,645.69"
 ```
 
-RABL renders your **result** object, not the input — Accord's job (untrusted params → trusted, typed values) is already done by the time the view runs. Typed values render through their own API (`Money#format`, `Date#iso8601`).
+RABL renders your **result** object, not the input — Accord's job (untrusted params → trusted, scale-controlled values) is already done by the time the view runs. Each value renders at its scale: decimals via `"%.<scale>f"`, the Money via `#format`.
 
-**Aside — echoing the input back.** If you *do* want to serialize the submission verbatim (a confirmation echo), `Schema#dump` gives its canonical external form in one call, no template:
+**Aside — echoing the input back.** If you *do* want to serialize the submission verbatim (a confirmation echo), `Schema#dump` gives its canonical external form — scales applied — in one call, no template:
 
 ```ruby
-render json: timesheet.dump   # => { rate: { amount: "45.50", currency: "USD" }, hours: "80.0", ... }
+render json: timesheet.dump   # => { rate: "45.50", hours: "80.125", ... }
 ```
 
 Runnable example: [`examples/rabl.rb`](../examples/rabl.rb).
