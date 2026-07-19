@@ -203,10 +203,13 @@ module Accord
     #     positive
     #     validate { |v| error(:bad) unless (v % 100).zero? }   # name optional
     #   end
-    class Configurator
-      # Route to the registry rather than Kernel#format.
-      undef_method :format
-
+    #
+    # It subclasses BasicObject deliberately: with almost no inherited methods,
+    # no validator name can collide with a Ruby built-in (`format`, `hash`,
+    # `test`, ...), and an unknown name raises instead of silently resolving to
+    # an inherited method. Everything routes through #method_missing to the
+    # registry.
+    class Configurator < BasicObject
       def initialize(field)
         @field = field
       end
@@ -214,24 +217,25 @@ module Accord
       # Custom inline rule. The name (default :custom) tags the resulting error's
       # validator; error codes come from the block's `error(:code)` calls.
       def validate(name = :custom, &block)
-        @field.add_validator(Validators::Custom.new(name, block))
+        @field.add_validator(::Accord::Validators::Custom.new(name, block))
       end
 
       # Reusable validator: a Validators::Base subclass or instance.
       def validator(validator)
-        @field.add_validator(validator.is_a?(Class) ? validator.new : validator)
+        @field.add_validator(validator.is_a?(::Class) ? validator.new : validator)
       end
-
-      private
 
       def method_missing(name, *args)
-        return super unless Validators.registered?(name)
+        unless ::Accord::Validators.registered?(name)
+          ::Kernel.raise ::NoMethodError,
+                         "unknown validator `#{name}` — register it with Accord::Validators.register(:#{name})"
+        end
 
-        @field.add_validator(Validators.build(name, *args))
+        @field.add_validator(::Accord::Validators.build(name, *args))
       end
 
-      def respond_to_missing?(name, include_private = false)
-        Validators.registered?(name) || super
+      def respond_to_missing?(name, _include_private = false)
+        ::Accord::Validators.registered?(name)
       end
     end
   end

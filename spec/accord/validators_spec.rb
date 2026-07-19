@@ -196,6 +196,19 @@ RSpec.describe "validation framework" do
       Accord::Validators.reset
       expect(Accord::Validators.registered?(:positive)).to be(true)
     end
+
+    it "resolves names that would collide with Ruby built-ins (BasicObject receiver)" do
+      Accord::Validators.register(:hash) { |value, collector| collector.add(:not_a_hash) unless value.is_a?(Hash) }
+      # `hash` on a normal receiver is Object#hash — here it routes to the validator
+      s = schema { string(:meta) { hash } }
+
+      expect(s.parse({ meta: "x" }).errors.first.code).to eq(:not_a_hash)
+    end
+
+    it "raises a clear error for an unknown validator name" do
+      expect { schema { string(:x) { no_such_validator } } }
+        .to raise_error(NoMethodError, /unknown validator/)
+    end
   end
 
   describe "an unnamed custom validate block" do
