@@ -87,24 +87,34 @@ CreateOrder.graphql_schemas.values.join("\n\n")   # AddressInput, LineItemInput,
 
 ## RABL
 
-RABL serializes objects **out**; Accord parses input **in** — they're complementary, meeting at two points.
-
-**Echo canonical input.** `Schema#dump` is the inverse of parse — the canonical external representation — so serializing what you parsed is one call:
+RABL serializes objects **out**; Accord parses input **in**. They sit at opposite ends of a request: Accord turns untrusted params into typed values, your domain logic computes a result, and RABL renders that result. The values flow through the middle with their types intact.
 
 ```ruby
-input = CreateEmployee.parse!(params)
-render json: input.dump   # => { name: "Ada", salary: "1000.00", hired_on: "2026-01-15", ... }
-```
+# 1. parse untrusted input — rate is a Money, hours a BigDecimal
+timesheet = Timesheet.parse!(params)
 
-**Render the typed object.** A parsed input exposes accessors (`input.name`, `input.salary`), so a RABL template renders it like any object:
+# 2. domain logic — Money * BigDecimal is still a Money (no float, no precision loss)
+paycheck = Paycheck.new(gross_pay: timesheet.rate * timesheet.hours, ...)
+
+# 3. serialize the result with RABL
+```
 
 ```ruby
-# app/views/employees/show.rabl
-object @input
-attributes :name, :salary, :hired_on
+# app/views/paychecks/show.rabl
+object @paycheck
+attributes :period_start, :period_end
+node(:gross_pay) { |p| p.gross_pay.format }   # Money -> "$3,640.00"
 ```
 
-`input.salary` is a `BigDecimal` there; for the canonical *string* form in the payload, use `Schema#dump` (above) or dump the field's type. Typically, though, RABL renders your **domain/model** object (the thing you built from the validated input), with Accord's job — turning untrusted params into that trusted input — already done. Runnable example: [`examples/rabl.rb`](../examples/rabl.rb).
+RABL renders your **result** object, not the input — Accord's job (untrusted params → trusted, typed values) is already done by the time the view runs. Typed values render through their own API (`Money#format`, `Date#iso8601`).
+
+**Aside — echoing the input back.** If you *do* want to serialize the submission verbatim (a confirmation echo), `Schema#dump` gives its canonical external form in one call, no template:
+
+```ruby
+render json: timesheet.dump   # => { rate: { amount: "45.50", currency: "USD" }, hours: "80.0", ... }
+```
+
+Runnable example: [`examples/rabl.rb`](../examples/rabl.rb).
 
 ---
 
