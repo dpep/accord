@@ -111,6 +111,7 @@ Where to go next:
 | Render structured errors | [Errors](docs/errors.md) |
 | Generate OpenAPI / wire up rswag | [OpenAPI](docs/openapi.md) |
 | Generate RBS / RBI for Sorbet or Steep | [Typing](docs/typing.md) |
+| Deserialize GraphQL input / serialize with RABL | [Integrations](docs/integrations.md) |
 
 ## License
 

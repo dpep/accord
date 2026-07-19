@@ -5,6 +5,7 @@ require_relative "types/string"
 require_relative "types/uuid"
 require_relative "types/email"
 require_relative "types/url"
+require_relative "types/ip_address"
 require_relative "types/iso_currency"
 require_relative "types/boolean"
 require_relative "types/integer"
@@ -21,6 +22,7 @@ module Accord
     register :uuid, UUID
     register :email, Email
     register :url, URL
+    register :ip_address, IPAddress
     register :iso_currency, ISOCurrency
     register :boolean, Boolean
     register :integer, Integer
