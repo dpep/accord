@@ -9,6 +9,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    name: Ruby
+
     steps:
       - name: clone ${{ github.repository }}
         uses: actions/checkout@v6
