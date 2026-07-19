@@ -125,6 +125,8 @@ end
 
 Registry API: `register(name, klass_or_&block)`, `registered?(name)`, `build(name, *args)`, `names`, `clear`, `reset` (restores the built-ins). Register your app's standard validators once in an initializer.
 
+> **Naming.** The field-block DSL resolves validator names through `method_missing`, which only fires for *undefined* methods. Avoid names that collide with Ruby's `Object`/`Kernel` methods (`hash`, `test`, `display`, …) — they'd silently resolve to the inherited method instead of your validator. (`format` is special-cased for you.)
+
 ## Nested validation
 
 Nested schemas produce nested paths automatically — no special handling:

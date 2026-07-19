@@ -25,6 +25,7 @@ Inside a schema, permissive parsing collects a structured error instead of retur
 | `boolean :active` | `true`/`false` | permissive accepts `"true"`/`"1"`/`"yes"` etc. |
 | `integer :age` | `Integer` | permissive accepts integer strings and whole Floats |
 | `date :on` | `Date` | ISO-8601 + configurable legacy `formats:` |
+| `datetime :at` | `Time` | timestamp (keeps time-of-day/offset); ISO-8601 + `formats:` |
 | `decimal :rate, scale: 4` | `BigDecimal` | configurable precision |
 | `currency :salary` | `BigDecimal` | `Decimal` with default `scale: 2`, strips `$`/`,` |
 | `duration :hrs, unit: :hours` | `BigDecimal` | `Decimal` labeled with a time unit |

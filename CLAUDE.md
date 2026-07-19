@@ -46,5 +46,7 @@ Built-in validators live in `Accord::Validators`; each reports `code` + metadata
 - Rounding is never silent — `decimal`/`currency`/`duration` reject excess precision unless `round: true`.
 - Keep the core gem free of Rails/ActiveSupport; Rails integration is opt-in (`require "accord/rails"`). The `money` gem is an optional dependency — `money` and `iso_currency` lazy-require it (`Accord.require_money!`) with a clear error if absent.
 - Tests: quality over quantity — accepted inputs, rejected inputs, strict vs. permissive, `dump`, and OpenAPI per type.
+- Configure at boot. `Accord.config`, the validator registry, and schema definitions are global mutable state initialized lazily (`@x ||=`) — set them in initializers, not concurrently at runtime.
+- Permissive parse never raises — it collects. A type's permissive `coerce` must route bad input through `invalid!` (never let an exception escape); guard edge cases like non-finite Floats.
 
 See [docs/design.md](docs/design.md) for milestones and open questions.

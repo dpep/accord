@@ -12,6 +12,7 @@ require_relative "types/iso_currency"
 require_relative "types/boolean"
 require_relative "types/integer"
 require_relative "types/date"
+require_relative "types/datetime"
 require_relative "types/decimal"
 require_relative "types/currency"
 require_relative "types/duration"
@@ -74,6 +75,10 @@ module Accord
 
       def date(name, *flags, formats: [], **opts, &block)
         field(name, Types::Date.new(formats:), *flags, **opts, &block)
+      end
+
+      def datetime(name, *flags, formats: [], **opts, &block)
+        field(name, Types::DateTime.new(formats:), *flags, **opts, &block)
       end
 
       def decimal(name, *flags, scale: Types::Decimal::DEFAULT_SCALE, round: false, **opts, &block)
