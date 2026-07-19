@@ -45,7 +45,7 @@ module Accord
 
       def coerce_float(value, strict:)
         invalid!(value) if strict
-        invalid!(value) unless value == value.to_i
+        invalid!(value) unless value.finite? && value == value.to_i
 
         value.to_i
       end

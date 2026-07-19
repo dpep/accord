@@ -28,6 +28,11 @@ RSpec.describe Accord::Types::Integer do
       expect(type.parse("4.5")).to be_nil
       expect(type.parse(4.5)).to be_nil
     end
+
+    it "rejects non-finite Floats without raising" do
+      expect(type.parse(Float::INFINITY)).to be_nil
+      expect(type.parse(Float::NAN)).to be_nil
+    end
   end
 
   describe "#openapi" do
