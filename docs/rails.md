@@ -169,25 +169,18 @@ end
 
 `error` is the `Accord::InvalidInput` exception; `error.errors` is the array of `Accord::Error`. Because errors are **structured data, not strings** (`path`, `code`, `validator`, `value`, metadata — see [errors.md](errors.md)), you can render whatever shape a client needs.
 
-### Rails-style `{ field => [messages] }`
+### Rails-style `{ field => [messages] }` (i18n)
 
-Messages are a rendering concern — map codes to text where the response is built:
+Accord ships localized messages and an `ActiveModel::Errors`-style renderer, `Accord::Messages` (loaded by `accord/rails`). Use it directly in your override:
 
 ```ruby
-MESSAGES = {
-  required:      "can't be blank",
-  not_positive:  "must be positive",
-  invalid_format: "is invalid",
-}.freeze
-
 def render_accord_errors(error)
-  grouped = error.errors.group_by(&:field).transform_values do |errs|
-    errs.map { |e| MESSAGES.fetch(e.code, e.code.to_s) }
-  end
-  render json: { errors: grouped }, status: :unprocessable_entity
+  render json: { errors: Accord::Messages.messages(error.errors) }, status: :unprocessable_entity
 end
-# => { "errors": { "salary": ["must be positive"], "name": ["can't be blank"] } }
+# => { "errors": { "salary": ["must be positive"], "name": ["is required"] } }
 ```
+
+`Accord::Messages` mirrors the API you know — `message`, `full_message`, `messages`, `full_messages`. Messages come from the shipped `accord.errors.<code>` locale, and you override any of them (or translate to another locale) in your own `config/locales`. Metadata like `expected`/`min`/`max` is interpolated automatically. See [errors.md](errors.md#i18n).
 
 ### GraphQL
 

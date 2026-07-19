@@ -72,21 +72,27 @@ end
 
 ### i18n
 
-`code` + `field` + `metadata` supply every interpolation a translation needs:
-
-```yaml
-# config/locales/en.yml
-en:
-  accord:
-    errors:
-      required: "%{field} is required"
-      too_small: "%{field} must be at least %{expected}"
-      out_of_range: "%{field} must be between %{min} and %{max}"
-```
+Accord ships default English messages keyed by error code, plus `Accord::Messages` — an I18n-backed renderer that mirrors `ActiveModel::Errors`, so it drops straight into Rails. In Rails it's loaded by `accord/rails`; elsewhere, `require "accord/i18n"`.
 
 ```ruby
-I18n.t("accord.errors.#{e.code}", field: e.field, **e.metadata)
+Accord::Messages.message(error)         # => "must be at least 18"        (field-less)
+Accord::Messages.full_message(error)    # => "Age must be at least 18"
+Accord::Messages.messages(errors)       # => { age: ["must be at least 18"], name: ["is required"] }
+Accord::Messages.full_messages(errors)  # => ["Age must be at least 18", "Name is required"]
 ```
+
+Validator metadata (`expected`, `min`, `max`, …) is interpolated automatically. Override any message — or translate to another locale — in your own `config/locales` (later load paths win):
+
+```yaml
+# config/locales/accord.es.yml
+es:
+  accord:
+    errors:
+      required: "es obligatorio"
+      too_small: "debe ser al menos %{expected}"
+```
+
+Custom validator codes fall back to the code string until you add a locale entry for them.
 
 ### Logs / metrics
 
