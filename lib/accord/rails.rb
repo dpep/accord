@@ -3,6 +3,7 @@
 require_relative "../accord"
 require_relative "controller_helpers"
 require_relative "notifications"
+require_relative "i18n"
 
 module Accord
   # Opt-in Rails integration. `require "accord/rails"` (e.g. from a Gemfile with

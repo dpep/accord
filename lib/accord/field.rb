@@ -67,19 +67,19 @@ module Accord
     # collects (never fails fast) so every error surfaces in one pass.
     def resolve(input, strict:, path:)
       present, raw = read(input)
-
-      if !present || raw.nil?
-        return Result.ok(resolve_default) if has_default?
-        raise MissingField, name if required? && strict
-        return Result.failed(error(path, :required)) if required?
-
-        return Result.ok(nil)
-      end
+      absent = resolve_absent(present, raw, strict:, path:)
+      return absent if absent
 
       result = coerce_present(raw, strict:, path:)
       return result unless result.errors.empty?
 
       Result.new(result.value, validate_value(result.value, path))
+    end
+
+    # The canonical external representation of a coerced value — the inverse of
+    # parse. Overridden per field kind; the base is identity (e.g. booleans).
+    def dump(value)
+      value
     end
 
     def openapi
@@ -113,7 +113,32 @@ module Accord
       required? || has_default?
     end
 
+    # The nested schema class this field references (object/array fields), or
+    # nil. Drives OpenAPI component collection.
+    def nested_schema
+      nil
+    end
+
+    # An OpenAPI $ref to a named schema's component, or the inline schema for an
+    # anonymous one.
+    def openapi_ref(schema)
+      schema.name ? { "$ref" => "#/components/schemas/#{schema.name}" } : schema.openapi
+    end
+
     private
+
+    # Handle the absent/default/required case. Returns a Result when the field
+    # is absent (its default, a :required error, or nil), or nil when a value is
+    # present and should be coerced. Shared by Field#resolve and the composite
+    # MoneyField#resolve.
+    def resolve_absent(present, raw, strict:, path:)
+      return if present && !raw.nil?
+      return Result.ok(resolve_default) if has_default?
+      raise MissingField, name if required? && strict
+      return Result.failed(error(path, :required)) if required?
+
+      Result.ok(nil)
+    end
 
     # @abstract Coerce a present (non-nil) raw value into a Result.
     def coerce_present(_raw, strict:, path:)
@@ -141,7 +166,7 @@ module Accord
     def validation_error(path, validator, value, violation)
       code = violation[:code]
       full_path = path + [name]
-      Accord.instrument(code, path: full_path, field: name, validator: validator.name, value:)
+      Accord.notify(code, path: full_path, field: name, validator: validator.name, value:)
       Error.new(path: full_path, field: name, code:, validator: validator.name, value:, **violation[:metadata])
     end
 
@@ -153,7 +178,7 @@ module Accord
     # Create a structured error and emit its permissive-parse event. Only ever
     # reached in non-strict mode (strict paths raise before collecting).
     def build_error(path:, code:, input: nil)
-      Accord.instrument(code, field: name, path:, input:)
+      Accord.notify(code, field: name, path:, input:)
       Error.new(field: name, path:, code:, input:)
     end
 

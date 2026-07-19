@@ -11,11 +11,13 @@ module Accord
   # default is non-strict — an API boundary tolerates and reports; strict is
   # the trusted-internal-caller mode.
   class Configuration
-    attr_accessor :strict, :default_currency
+    attr_accessor :strict, :default_currency, :notifications, :observe_coercions
 
     def initialize
       @strict = false
       @default_currency = nil
+      @notifications = true    # emit accord.parse.<code> error/rounding events
+      @observe_coercions = false # emit accord.parse.coerced (permissive -> strict signal)
     end
   end
 end

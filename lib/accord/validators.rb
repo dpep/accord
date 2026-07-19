@@ -99,11 +99,11 @@ module Accord
       end
 
       def validate(value, collector)
-        collector.add(:out_of_range, min: range.min, max: range.max) unless range.cover?(value)
+        collector.add(:out_of_range, min: range.begin, max: range.end) unless range.cover?(value)
       end
 
       def openapi
-        { minimum: range.min, maximum: range.max }
+        { minimum: range.begin, maximum: range.end }
       end
     end
 
@@ -115,11 +115,11 @@ module Accord
       end
 
       def validate(value, collector)
-        collector.add(:invalid_length, min: range.min, max: range.max) unless range.cover?(value.length)
+        collector.add(:invalid_length, min: range.begin, max: range.end) unless range.cover?(value.length)
       end
 
       def openapi
-        { minLength: range.min, maxLength: range.max }
+        { minLength: range.begin, maxLength: range.end }
       end
     end
 

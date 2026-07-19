@@ -1,0 +1,30 @@
+# Default English messages for Accord's built-in error codes. Keyed by
+# Accord::Error#code; validator metadata (expected/min/max) is interpolated.
+# Override any of these in your own config/locales — later load paths win.
+en:
+  accord:
+    errors:
+      # presence & validation
+      required: "is required"
+      not_positive: "must be positive"
+      not_negative: "must be negative"
+      zero: "must not be zero"
+      too_small: "must be at least %{expected}"
+      too_large: "must be at most %{expected}"
+      out_of_range: "must be between %{min} and %{max}"
+      invalid_length: "must be between %{min} and %{max} characters"
+      not_included: "is not a valid option"
+      excluded: "is reserved"
+      invalid_format: "is invalid"
+      # coercion
+      invalid_currency: "is not a valid amount"
+      invalid_decimal: "is not a valid number"
+      invalid_integer: "is not a valid integer"
+      invalid_date: "is not a valid date"
+      invalid_boolean: "is not a valid boolean"
+      invalid_string: "is invalid"
+      invalid_uuid: "is not a valid UUID"
+      invalid_isocurrency: "is not a valid currency code"
+      invalid_scale: "has too many decimal places"
+      invalid_object: "must be an object"
+      invalid_array: "must be a list"

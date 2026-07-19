@@ -19,10 +19,12 @@ RSpec.describe "permissive-parse instrumentation" do
   end
 
   around do |example|
-    previous = Accord.notifier
+    previous_notifier = Accord.notifier
+    previous_notifications = Accord.config.notifications
     Accord.notifier = recorder.new(events)
     example.run
-    Accord.notifier = previous
+    Accord.notifier = previous_notifier
+    Accord.config.notifications = previous_notifications
   end
 
   it "emits an event per tolerated coercion error" do
@@ -53,6 +55,13 @@ RSpec.describe "permissive-parse instrumentation" do
 
   it "does not emit for valid input" do
     schema.parse({ name: "Ada", salary: "10" })
+    expect(events).to be_empty
+  end
+
+  it "can be disabled via config.notifications" do
+    Accord.config.notifications = false
+
+    schema.parse({ salary: "$abc" })
     expect(events).to be_empty
   end
 end

@@ -98,7 +98,7 @@ module Accord
         raise CoercionError.new(code: :invalid_scale, input:) unless round?
 
         rounded = decimal.round(scale)
-        Accord.instrument(:rounded, input:, scale:, value: rounded) unless strict
+        Accord.notify(:rounded, input:, scale:, value: rounded) unless strict
         rounded
       end
     end
