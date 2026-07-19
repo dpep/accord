@@ -144,6 +144,29 @@ RSpec.describe Accord::ControllerHelpers do
       end.to raise_error(ArgumentError, /inline/)
     end
 
+    it "parses a list input with the [Schema] shorthand" do
+      input = schema
+      controller = build_controller { accord :people, [input], from: :people }
+                   .new({ people: [{ name: "Ada" }, { name: "Bo" }] })
+
+      expect(controller.people.map(&:name)).to eq(%w[Ada Bo])
+    end
+
+    it "aggregates list errors with index paths, rendered as a 422" do
+      input = schema   # requires :name
+      controller = build_controller { accord :people, [input], from: :people }
+                   .new({ people: [{ name: "Ada" }, {}] })
+      controller.dispatch { people }
+
+      expect(controller.rendered[:status]).to eq(:unprocessable_entity)
+      expect(controller.rendered[:json][:errors].first[:path]).to eq([1, :name])
+    end
+
+    it "rejects a list source with more than one schema" do
+      input = schema
+      expect { build_controller { accord :people, [input, input] } }.to raise_error(ArgumentError)
+    end
+
     it "requires either a schema or a block" do
       expect { build_controller { accord :employee } }.to raise_error(ArgumentError)
     end

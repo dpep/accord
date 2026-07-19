@@ -48,13 +48,10 @@ class EmployeesController < ApplicationController
     string  :name
     boolean :active
   end
-  # (3) proc + array field — a JSON:API list arrives as a bare array under
-  # `data`; the proc reshapes it into { employees: [...] } so an `array` field
-  # parses each element through CreateEmployee (errors nest, e.g.
-  # [:employees, 2, :salary]).
-  accord :batch, from: -> { { employees: params[:data] } } do
-    array :employees, CreateEmployee
-  end
+  # (3) list + proc — `[CreateEmployee]` parses an array (the reader returns an
+  # array of parsed inputs); the proc pulls each JSON:API resource's attributes
+  # out. Errors carry the row index, e.g. [2, :salary].
+  accord :batch, [CreateEmployee], from: -> { Array(params[:data]).map { |r| r[:attributes] } }
 
   # POST /employees  { "name": "Ada", "email": "ada@x.co", "salary": "$65,000" }
   # -> 201 (active defaults to true, role to "member"), or 422 if invalid.
@@ -70,9 +67,10 @@ class EmployeesController < ApplicationController
     render json: scope
   end
 
-  # POST /employees/import  { "data": [ { "name": "Ada", ... }, { "name": "Bo", ... } ] }
+  # POST /employees/import
+  #   { "data": [ { "type": "employees", "attributes": { "name": "Ada", ... } }, ... ] }
   def import
-    Employee.insert_all!(batch.employees.map(&:to_h))   # all-or-nothing: one 422 lists every bad row
+    Employee.insert_all!(batch.map(&:to_h))   # all-or-nothing: one 422 lists every bad row
     head :created
   end
 end

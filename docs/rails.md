@@ -124,6 +124,18 @@ end
 
 The inline schema is named as a controller constant (`:search` → `SearchController::SearchInput`), so it still projects to OpenAPI/RBS/RBI. Pass `const:` to choose the name (`accord :search, const: :SearchParams do … end`); accord refuses to clobber an existing constant that isn't itself a schema. Reach for a top-level named class when you want reuse across controllers or isolated schema tests. `accord` requires exactly one of a schema class or a block.
 
+### List inputs
+
+Wrap the schema in a one-element array to parse a **list** — the reader returns an array of parsed inputs, and errors carry each element's index (`[2, :salary]`, no wrapper key):
+
+```ruby
+accord :batch, [CreateEmployee], from: :employees   # params[:employees] is an array
+
+def import
+  Employee.insert_all!(batch.map(&:to_h))           # one 422 lists every bad row
+end
+```
+
 Eager validation (fail before the action body) is just a `before_action`:
 
 ```ruby

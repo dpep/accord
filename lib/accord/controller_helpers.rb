@@ -55,6 +55,9 @@ module Accord
       # name explicitly:
       #
       #   accord :employee, const: :NewHire do ... end   # -> NewHire constant
+      # A one-element array denotes a **list** input — `accord :batch,
+      # [CreateEmployee]` parses an array, and the reader returns an array of
+      # parsed instances (errors carry each element's index: `[2, :salary]`).
       def accord(name, schema = nil, from: nil, const: nil, &block)
         if block
           raise ArgumentError, "accord :#{name} takes a schema or a block, not both" if schema
@@ -64,6 +67,8 @@ module Accord
           raise ArgumentError, "accord :#{name} requires a schema class or a block"
         elsif const
           raise ArgumentError, "accord :#{name}: `const:` only applies to an inline (block) schema"
+        elsif schema.is_a?(Array) && schema.size != 1
+          raise ArgumentError, "accord :#{name}: a list source takes exactly one schema, e.g. [CreateEmployee]"
         end
 
         define_method(name) { accord_input(name, schema, from) }
@@ -103,7 +108,27 @@ module Accord
       @accord_inputs ||= {}
       return @accord_inputs[name] if @accord_inputs.key?(name)
 
-      @accord_inputs[name] = schema.parse!(accord_source(from))
+      source = accord_source(from)
+      @accord_inputs[name] = schema.is_a?(Array) ? parse_accord_list(schema.first, source) : schema.parse!(source)
+    end
+
+    # Aggregates errors from a failed list parse for InvalidInput to render.
+    ListErrors = Struct.new(:errors)
+
+    # Parse a list input ([Schema] shorthand): each element through `element` at
+    # its index, so errors read `[i, :field]` with no wrapper key. Returns the
+    # parsed instances, or raises InvalidInput carrying every element's errors.
+    def parse_accord_list(element, source)
+      items = source.nil? ? [] : source
+      unless items.is_a?(Array)
+        raise Accord::InvalidInput, ListErrors.new([Accord::Error.new(path: [], code: :invalid_array, input: source)])
+      end
+
+      members = items.map.with_index { |item, index| element.parse(item, path: [index]) }
+      errors = members.flat_map(&:errors)
+      raise Accord::InvalidInput, ListErrors.new(errors) unless errors.empty?
+
+      members
     end
 
     # Resolve the raw input for a declared schema. `from:` is a params key
