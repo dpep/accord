@@ -76,6 +76,10 @@ module Accord
       "Money"
     end
 
+    def sorbet
+      "Money"
+    end
+
     private
 
     def coerce_money(input, raw, strict:, path:)

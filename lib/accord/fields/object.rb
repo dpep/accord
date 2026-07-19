@@ -24,6 +24,10 @@ module Accord
       schema.name || "untyped"
     end
 
+    def sorbet
+      schema.name || "T.untyped"
+    end
+
     private
 
     def coerce_present(raw, strict:, path:)

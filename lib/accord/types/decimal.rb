@@ -55,6 +55,10 @@ module Accord
         "BigDecimal"
       end
 
+      def sorbet
+        "BigDecimal"
+      end
+
       private
 
       def coerce(value, strict:)

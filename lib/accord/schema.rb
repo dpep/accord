@@ -146,12 +146,24 @@ module Accord
         raise ArgumentError, "cannot generate RBS for an anonymous schema — pass class_name:" if class_name.nil?
 
         signatures = fields.each_value.map do |field|
-          type = field.rbs
-          type = "#{type}?" unless field.required? || field.has_default?
-          "  def #{field.name}: () -> #{type}"
+          "  def #{field.name}: () -> #{field.rbs_return}"
         end
 
         ["class #{class_name} < Accord::Schema", *signatures, "end"].join("\n")
+      end
+
+      # Project this schema into a Sorbet RBI class declaration — the RBI sibling
+      # of #rbs, for Sorbet-typed codebases. Prefer the bundled Tapioca DSL
+      # compiler (auto-discovered by `tapioca dsl`) for Sorbet projects; this is
+      # the manual/standalone form.
+      def rbi(class_name: name)
+        raise ArgumentError, "cannot generate RBI for an anonymous schema — pass class_name:" if class_name.nil?
+
+        methods = fields.each_value.map do |field|
+          "  sig { returns(#{field.sorbet_return}) }\n  def #{field.name}; end"
+        end
+
+        ["class #{class_name} < Accord::Schema", methods.join("\n\n"), "end"].join("\n")
       end
     end
 

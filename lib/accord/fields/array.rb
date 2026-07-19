@@ -24,6 +24,10 @@ module Accord
       "Array[#{schema.name || "untyped"}]"
     end
 
+    def sorbet
+      "T::Array[#{schema.name || "T.untyped"}]"
+    end
+
     private
 
     def coerce_present(raw, strict:, path:)

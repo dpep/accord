@@ -31,6 +31,10 @@ module Accord
         "Date"
       end
 
+      def sorbet
+        "Date"
+      end
+
       private
 
       def coerce(value, strict:)

@@ -21,6 +21,10 @@ module Accord
         "String"
       end
 
+      def sorbet
+        "String"
+      end
+
       private
 
       def coerce(value, strict:)

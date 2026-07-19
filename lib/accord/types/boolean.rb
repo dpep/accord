@@ -20,6 +20,10 @@ module Accord
         "bool"
       end
 
+      def sorbet
+        "T::Boolean"
+      end
+
       private
 
       def coerce(value, strict:)

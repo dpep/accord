@@ -25,6 +25,10 @@ module Accord
       type.rbs
     end
 
+    def sorbet
+      type.sorbet
+    end
+
     private
 
     def coerce_present(raw, strict:, path:)

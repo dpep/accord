@@ -72,6 +72,28 @@ module Accord
       raise NotImplementedError, "#{self.class} must implement #rbs"
     end
 
+    # The Sorbet type this field's reader returns, e.g. "String", "T::Array[Employee]".
+    def sorbet
+      raise NotImplementedError, "#{self.class} must implement #sorbet"
+    end
+
+    # Reader return types with nullability applied: required/defaulted fields are
+    # non-nilable, optional fields are nilable (the valid-shape contract). Shared
+    # by the RBS/RBI string projections and the Tapioca compiler.
+    def rbs_return
+      non_nilable? ? rbs : "#{rbs}?"
+    end
+
+    def sorbet_return
+      non_nilable? ? sorbet : "T.nilable(#{sorbet})"
+    end
+
+    # A field's reader is non-nilable in the valid-shape contract when it's
+    # required or has a default.
+    def non_nilable?
+      required? || has_default?
+    end
+
     private
 
     # @abstract Coerce a present (non-nil) raw value into a Result.

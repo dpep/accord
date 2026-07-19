@@ -146,6 +146,8 @@ CreateEmployee.rbs
 
 Required and defaulted fields are non-nilable; optional fields are nilable (the valid-shape contract). Typing is a *projection* of the schema, the same pattern as OpenAPI — see [docs/design.md](docs/design.md).
 
+**Steep** consumes the `.rbs` directly — write it into `sig/`. **Sorbet** reads RBI, so Accord also projects `Schema.rbi` and ships a **Tapioca DSL compiler**: in a project with `tapioca`, `tapioca dsl` auto-discovers it and generates typed reader RBI for every schema — no manual conversion. Both paths share one type mapping (`Field#sorbet_return` / `#rbs_return`).
+
 ## Errors
 
 Errors are first-class objects (`Accord::Error`) carrying `field`, `path`, `code`, `message`, `input`, and `value`. Paths are arrays so nested schemas (coming next) can point at `[:employees, 2, :salary]`.

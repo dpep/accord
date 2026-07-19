@@ -60,6 +60,11 @@ module Accord
       raise NotImplementedError, "#{self.class} must implement #rbs"
     end
 
+    # The Sorbet type of the canonical internal value, e.g. "String", "T::Boolean".
+    def sorbet
+      raise NotImplementedError, "#{self.class} must implement #sorbet"
+    end
+
     # Short symbol name for a type, e.g. Accord::Types::Currency -> :currency.
     def type_name
       self.class.name.split("::").last.gsub(/([a-z])([A-Z])/, '\1_\2').downcase.to_sym
