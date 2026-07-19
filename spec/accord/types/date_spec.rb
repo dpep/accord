@@ -41,6 +41,11 @@ RSpec.describe Accord::Types::Date do
     it "returns nil in permissive mode for garbage" do
       expect(type.parse("not a date")).to be_nil
     end
+
+    it "rejects an un-coercible type" do
+      expect(type.parse([])).to be_nil
+      expect { type.parse!(42) }.to raise_error(Accord::CoercionError)
+    end
   end
 
   describe "#dump" do

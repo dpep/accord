@@ -42,6 +42,11 @@ RSpec.describe Accord::Types::DateTime do
     it "returns nil in permissive mode for garbage" do
       expect(type.parse("not a time")).to be_nil
     end
+
+    it "rejects an un-coercible type" do
+      expect(type.parse([])).to be_nil
+      expect { type.parse!(42) }.to raise_error(Accord::CoercionError)
+    end
   end
 
   describe "#dump" do
@@ -50,9 +55,11 @@ RSpec.describe Accord::Types::DateTime do
     end
   end
 
-  describe "#openapi" do
-    it "describes a date-time string" do
+  describe "projections" do
+    it "describes a date-time across formats" do
       expect(type.openapi).to eq(type: "string", format: "date-time")
+      expect(type.rbs).to eq("Time")
+      expect(type.sorbet).to eq("Time")
     end
   end
 end

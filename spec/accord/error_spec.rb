@@ -42,4 +42,10 @@ RSpec.describe Accord::Error do
     b = described_class.new(path: [:x], code: :bad, validator: :min, expected: 0)
     expect(a).to eq(b)
   end
+
+  it "hashes by value, so equal errors dedupe in a Set" do
+    a = described_class.new(path: [:x], code: :bad, validator: :min, expected: 0)
+    b = described_class.new(path: [:x], code: :bad, validator: :min, expected: 0)
+    expect(Set.new([a, b]).size).to eq(1)
+  end
 end

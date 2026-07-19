@@ -170,6 +170,16 @@ RSpec.describe "validation framework" do
       s = schema { iso_currency(:currency) { inclusion %w[USD EUR GBP] } }
       expect(s.fields[:currency].openapi).to include(enum: %w[USD EUR GBP])
     end
+
+    it "min/max contribute minimum/maximum" do
+      s = schema { integer(:qty) { min 1; max 99 } }
+      expect(s.fields[:qty].openapi).to include(minimum: 1, maximum: 99)
+    end
+
+    it "format contributes pattern" do
+      s = schema { string(:code) { format(/\A[A-Z]{3}\z/) } }
+      expect(s.fields[:code].openapi).to include(pattern: "\\A[A-Z]{3}\\z")
+    end
   end
 
   describe "the validator registry" do

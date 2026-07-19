@@ -27,6 +27,11 @@ RSpec.describe Accord::Types::Decimal do
     it "rejects non-numeric strings" do
       expect { type.parse!("abc") }.to raise_error(Accord::CoercionError)
     end
+
+    it "rejects an un-coercible type" do
+      expect(type.parse([])).to be_nil
+      expect { type.parse!({}) }.to raise_error(Accord::CoercionError)
+    end
   end
 
   describe "scale enforcement" do

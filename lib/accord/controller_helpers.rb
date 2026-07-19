@@ -2,6 +2,7 @@
 
 require_relative "errors"
 require_relative "schema"
+require_relative "list_schema"
 
 module Accord
   # Rails controller integration. The schema is the entry point — call
@@ -55,45 +56,52 @@ module Accord
       # name explicitly:
       #
       #   accord :employee, const: :NewHire do ... end   # -> NewHire constant
+      #
       # A one-element array denotes a **list** input — `accord :batch,
-      # [CreateEmployee]` parses an array, and the reader returns an array of
-      # parsed instances (errors carry each element's index: `[2, :salary]`).
+      # [CreateEmployee]` parses an array (the reader returns the parsed
+      # elements, errors carrying each index: `[2, :salary]`) and mints a
+      # projectable ListSchema constant, just like an inline block.
       def accord(name, schema = nil, from: nil, const: nil, &block)
-        if block
-          raise ArgumentError, "accord :#{name} takes a schema or a block, not both" if schema
+        input =
+          if block
+            raise ArgumentError, "accord :#{name} takes a schema or a block, not both" if schema
 
-          schema = define_inline_schema(name, const, &block)
-        elsif schema.nil?
-          raise ArgumentError, "accord :#{name} requires a schema class or a block"
-        elsif const
-          raise ArgumentError, "accord :#{name}: `const:` only applies to an inline (block) schema"
-        elsif schema.is_a?(Array) && schema.size != 1
-          raise ArgumentError, "accord :#{name}: a list source takes exactly one schema, e.g. [CreateEmployee]"
-        end
+            register_accord_schema(name, const) { Class.new(Schema, &block) }
+          elsif schema.nil?
+            raise ArgumentError, "accord :#{name} requires a schema class or a block"
+          elsif schema.is_a?(Array)
+            raise ArgumentError, "accord :#{name}: a list source takes exactly one schema, e.g. [CreateEmployee]" if schema.size != 1
 
-        define_method(name) { accord_input(name, schema, from) }
+            register_accord_schema(name, const) { ListSchema.new(schema.first) }
+          elsif const
+            raise ArgumentError, "accord :#{name}: `const:` only applies to an inline (block) or list schema"
+          else
+            schema
+          end
+
+        define_method(name) { accord_input(name, input, from) }
       end
 
       private
 
-      # Build an anonymous schema from a block and name it as a controller
-      # constant so it projects like a top-level schema class. The default name
-      # (`:employee` -> `EmployeeInput`) carries an `Input` suffix to avoid
-      # shadowing a same-named model. Refuses to clobber an existing constant
-      # that isn't itself an Accord schema — pass `const:` to pick another name.
-      def define_inline_schema(name, const, &block)
+      # Name a generated schema (inline block or list) as a controller constant
+      # so it projects like a top-level schema. The default name (`:employee` ->
+      # `EmployeeInput`) carries an `Input` suffix to avoid shadowing a same-named
+      # model. Refuses to clobber a constant that isn't itself accord-generated —
+      # pass `const:` to pick another name.
+      def register_accord_schema(name, const)
         const = (const || "#{name.to_s.split(/[^a-zA-Z0-9]+/).map(&:capitalize).join}Input").to_s
 
         if const_defined?(const, false)
           existing = const_get(const)
-          unless existing.is_a?(Class) && existing < Schema
+          unless (existing.is_a?(Class) && existing < Schema) || existing.is_a?(ListSchema)
             raise ArgumentError,
                   "accord :#{name} would overwrite the existing constant #{const} — pass `const:` to choose another name"
           end
           remove_const(const)
         end
 
-        const_set(const, Class.new(Schema, &block))
+        const_set(const, yield)
       end
     end
 
@@ -108,27 +116,7 @@ module Accord
       @accord_inputs ||= {}
       return @accord_inputs[name] if @accord_inputs.key?(name)
 
-      source = accord_source(from)
-      @accord_inputs[name] = schema.is_a?(Array) ? parse_accord_list(schema.first, source) : schema.parse!(source)
-    end
-
-    # Aggregates errors from a failed list parse for InvalidInput to render.
-    ListErrors = Struct.new(:errors)
-
-    # Parse a list input ([Schema] shorthand): each element through `element` at
-    # its index, so errors read `[i, :field]` with no wrapper key. Returns the
-    # parsed instances, or raises InvalidInput carrying every element's errors.
-    def parse_accord_list(element, source)
-      items = source.nil? ? [] : source
-      unless items.is_a?(Array)
-        raise Accord::InvalidInput, ListErrors.new([Accord::Error.new(path: [], code: :invalid_array, input: source)])
-      end
-
-      members = items.map.with_index { |item, index| element.parse(item, path: [index]) }
-      errors = members.flat_map(&:errors)
-      raise Accord::InvalidInput, ListErrors.new(errors) unless errors.empty?
-
-      members
+      @accord_inputs[name] = schema.parse!(accord_source(from))
     end
 
     # Resolve the raw input for a declared schema. `from:` is a params key

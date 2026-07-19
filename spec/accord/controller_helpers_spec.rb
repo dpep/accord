@@ -167,6 +167,16 @@ RSpec.describe Accord::ControllerHelpers do
       expect { build_controller { accord :people, [input, input] } }.to raise_error(ArgumentError)
     end
 
+    it "mints a projectable ListSchema constant for a list input" do
+      controller = build_controller
+      stub_const("ImportsController", controller)
+      element = stub_const("Person", Class.new(Accord::Schema) { string :name, :required })
+      controller.class_eval { accord :people, [element] }
+
+      expect(ImportsController::PeopleInput).to be_a(Accord::ListSchema)
+      expect(ImportsController::PeopleInput.openapi[:type]).to eq("array")
+    end
+
     it "requires either a schema or a block" do
       expect { build_controller { accord :employee } }.to raise_error(ArgumentError)
     end

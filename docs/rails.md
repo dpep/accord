@@ -126,7 +126,7 @@ The inline schema is named as a controller constant (`:search` → `SearchContro
 
 ### List inputs
 
-Wrap the schema in a one-element array to parse a **list** — the reader returns an array of parsed inputs, and errors carry each element's index (`[2, :salary]`, no wrapper key):
+Wrap the schema in a one-element array to parse a **list** — the reader returns the parsed inputs, and errors carry each element's index (`[2, :salary]`, no wrapper key):
 
 ```ruby
 accord :batch, [CreateEmployee], from: :employees   # params[:employees] is an array
@@ -135,6 +135,8 @@ def import
   Employee.insert_all!(batch.map(&:to_h))           # one 422 lists every bad row
 end
 ```
+
+Like an inline block, this mints a projectable constant — an `Accord::ListSchema` (`BatchInput`) that projects array-shaped: OpenAPI `{ type: array, items: $ref }`, RBS `Array[CreateEmployee]`, GraphQL `[CreateEmployeeInput!]!`. `Accord::ListSchema.new(CreateEmployee)` is usable outside Rails too.
 
 Eager validation (fail before the action body) is just a `before_action`:
 

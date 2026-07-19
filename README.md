@@ -3,7 +3,9 @@ accord
 ![Gem](https://img.shields.io/gem/dt/accord?style=plastic)
 [![codecov](https://codecov.io/gh/dpep/accord/branch/main/graph/badge.svg)](https://codecov.io/gh/dpep/accord)
 
-Executable API contracts for Ruby.
+API contracts for Ruby.
+
+> **accord** — *n.* a state of agreement, harmony, or a formal treaty between parties. *v.* to be consistent with something.
 
 One schema declaration is the source of truth for an API boundary: it parses untrusted input into canonical, typed Ruby values, validates it, collects structured errors, and projects itself into OpenAPI and RBS/RBI. Its home turf is the Rails controller — typed, validated request input, with no `permit` dance and no hand-written coercion.
 

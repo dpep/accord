@@ -33,11 +33,18 @@ RSpec.describe Accord::Types::Integer do
       expect(type.parse(Float::INFINITY)).to be_nil
       expect(type.parse(Float::NAN)).to be_nil
     end
+
+    it "rejects an un-coercible type" do
+      expect(type.parse([])).to be_nil
+      expect { type.parse!({}) }.to raise_error(Accord::CoercionError)
+    end
   end
 
-  describe "#openapi" do
-    it "describes an integer" do
+  describe "projections" do
+    it "describes an integer across formats" do
       expect(type.openapi).to eq(type: "integer")
+      expect(type.rbs).to eq("Integer")
+      expect(type.sorbet).to eq("Integer")
     end
   end
 end

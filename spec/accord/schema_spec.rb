@@ -176,4 +176,25 @@ RSpec.describe Accord::Schema do
       expect(schema.fields.keys).not_to include(:department)
     end
   end
+
+  describe "reading parsed values" do
+    let(:input) { schema.parse({ name: "Ada", salary: "$1,000.00" }) }
+
+    it "exposes the internal values as a hash via #to_h" do
+      expect(input.to_h).to include(name: "Ada", active: true, salary: BigDecimal("1000.00"))
+    end
+
+    it "reads a single field via #[]" do
+      expect(input[:name]).to eq("Ada")
+    end
+  end
+
+  describe ".field" do
+    it "declares a scalar field backed by an explicit type instance" do
+      klass = Class.new(described_class) { field :code, Accord::Types::UUID.new, :required }
+
+      expect(klass.parse({ code: "550E8400-E29B-41D4-A716-446655440000" }).code).to eq("550e8400-e29b-41d4-a716-446655440000")
+      expect(klass.fields[:code].required?).to be(true)
+    end
+  end
 end
