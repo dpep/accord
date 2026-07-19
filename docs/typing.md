@@ -91,6 +91,8 @@ OUTPUT=sig/inputs.rbs bundle exec rake accord:rbs
 
 Under Rails the task is auto-registered (it eager-loads the app first). Outside Rails, `require "accord/rake"` in your `Rakefile` and make sure your schemas are loaded. Discovery is `Accord::Schema.descendants.select(&:name)` — the same hook you can use directly to build a custom export.
 
+Only **named** schemas are exported — a truly anonymous `Class.new(Accord::Schema)` has no name to declare, and `Schema.rbs` raises on one. This isn't a gap: inline controller inputs and `[Schema]` lists are named (the macro assigns them constants), named nested schemas each get their own declaration, and an anonymous *nested* schema is still captured — inlined by its parent in OpenAPI, or rendered `untyped` in RBS (name it to get a real reference). The task prints how many it skipped rather than dropping them silently.
+
 ---
 
 See also: [getting_started.md](getting_started.md) · [types.md](types.md)
