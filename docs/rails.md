@@ -284,13 +284,25 @@ end
 
 ## Observability
 
-Every error tolerated by a permissive parse emits an `ActiveSupport::Notifications` event named `accord.parse.<code>`, wired up by `accord/rails`. Subscribe to track malformed-input rates, drive alerts, or debug an API migration:
+Every error tolerated by a permissive parse emits an `ActiveSupport::Notifications` event named `accord.parse.<code>`, wired up by `accord/rails`. Subscribe to track malformed-input rates, drive alerts, or debug an API migration.
+
+The simplest useful subscriber just logs each tolerated error:
+
+```ruby
+# config/initializers/accord_logging.rb
+ActiveSupport::Notifications.subscribe(/accord\.parse/) do |name, _start, _finish, _id, payload|
+  # name    => "accord.parse.invalid_currency"
+  # payload => { field: :salary, path: [:salary], validator: :positive, value: ... }
+  Rails.logger.info("[accord] #{name} at #{payload[:path].inspect} (#{payload[:field]})")
+end
+```
+
+Or push counts to a metrics backend:
 
 ```ruby
 # config/initializers/accord_metrics.rb
 ActiveSupport::Notifications.subscribe(/accord\.parse/) do |name, _start, _finish, _id, payload|
   StatsD.increment(name, tags: { field: payload[:field], code: name.split(".").last })
-  # payload => { field: :salary, path: [:salary], validator: :positive, value: ... }
 end
 ```
 

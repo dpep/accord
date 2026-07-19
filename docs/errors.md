@@ -108,13 +108,14 @@ Structured errors are log- and metric-friendly as-is (`e.to_h`), and permissive 
 
 ## Observability
 
-In permissive mode, every error Accord tolerates emits an `ActiveSupport::Notifications` event named `accord.parse.<code>` (wired by `accord/rails`). Subscribe to measure malformed-input rates or watch an API migration:
+In permissive mode, every error Accord tolerates emits an `ActiveSupport::Notifications` event named `accord.parse.<code>` (wired by `accord/rails`). Subscribe to log tolerated errors, measure malformed-input rates, or watch an API migration:
 
 ```ruby
 ActiveSupport::Notifications.subscribe(/accord\.parse/) do |name, _s, _f, _id, payload|
   # name    => "accord.parse.invalid_currency"
   # payload => { field: :salary, path: [:salary], validator: :positive, value: ... }
-  StatsD.increment(name, tags: { field: payload[:field] })
+  Rails.logger.info("[accord] #{name} at #{payload[:path].inspect}")   # simplest: log it
+  StatsD.increment(name, tags: { field: payload[:field] })             # or count it
 end
 ```
 
