@@ -7,9 +7,9 @@ RSpec.describe Accord::Schema do
     Class.new(described_class) do
       string :name, required: true
       boolean :active, default: true
-      currency :salary
-
-      validate(:salary) { |salary| error(:must_be_positive) if salary.negative? }
+      currency :salary do
+        validate(:must_be_positive) { |salary| error(:must_be_positive) if salary.negative? }
+      end
     end
   end
 
@@ -70,35 +70,34 @@ RSpec.describe Accord::Schema do
   end
 
   describe "validation" do
-    it "runs custom validations against coerced values" do
+    it "runs field validators against coerced values" do
       input = schema.parse({ name: "Ada", salary: "-5" })
 
       expect(input).not_to be_valid
       expect(input.errors.map(&:code)).to include(:must_be_positive)
     end
 
-    it "skips field-scoped validations when the field failed coercion" do
+    it "skips validators when the field failed coercion" do
       input = schema.parse({ name: "Ada", salary: "$abc" })
 
       expect(input.errors.map(&:code)).to contain_exactly(:invalid_currency)
     end
 
-    it "skips field-scoped validations when the field is absent" do
+    it "skips validators when the field is absent" do
       input = schema.parse({ name: "Ada" })
       expect(input).to be_valid
     end
 
-    it "runs validations in declaration order" do
-      order = []
+    it "aggregates every error across fields in one pass" do
       klass = Class.new(described_class) do
-        string :a
-        string :b
-        validate(:a) { order << :a }
-        validate(:b) { order << :b }
+        string :name, required: true
+        integer :age do
+          min 18
+        end
       end
 
-      klass.parse({ a: "x", b: "y" })
-      expect(order).to eq(%i[a b])
+      input = klass.parse({ age: "5" })
+      expect(input.errors.map(&:code)).to contain_exactly(:required, :too_small)
     end
   end
 

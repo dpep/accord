@@ -1,44 +1,45 @@
 # frozen_string_literal: true
 
 RSpec.describe Accord::Error do
-  subject(:error) do
-    described_class.new(
-      field: :salary,
-      path: [:employee, :salary],
-      code: :invalid_currency,
-      input: "$abc",
-    )
-  end
-
   it "exposes its structured attributes" do
-    expect(error.field).to eq(:salary)
-    expect(error.path).to eq([:employee, :salary])
-    expect(error.code).to eq(:invalid_currency)
-    expect(error.input).to eq("$abc")
-  end
-
-  it "defaults its message to the code" do
-    expect(error.message).to eq("invalid_currency")
-  end
-
-  it "serializes to a hash for rendering" do
-    expect(error.to_h).to eq(
-      field: :salary,
-      path: [:employee, :salary],
-      code: :invalid_currency,
-      message: "invalid_currency",
-      input: "$abc",
-      value: nil,
+    error = described_class.new(
+      path: [:discount], code: :too_small, validator: :min, value: -5, expected: 0,
     )
+
+    expect(error.path).to eq([:discount])
+    expect(error.code).to eq(:too_small)
+    expect(error.validator).to eq(:min)
+    expect(error.value).to eq(-5)
+    expect(error.metadata).to eq(expected: 0)
+  end
+
+  it "defaults field to the last path segment" do
+    error = described_class.new(path: [:employees, 3, :salary], code: :not_positive)
+    expect(error.field).to eq(:salary)
+  end
+
+  it "carries no message — rendering is a separate concern" do
+    expect(described_class.new(path: [:x], code: :bad)).not_to respond_to(:message)
+  end
+
+  it "serializes to structured data, dropping nil keys" do
+    error = described_class.new(
+      path: [:discount], code: :too_small, validator: :min, value: -5, expected: 0,
+    )
+
+    expect(error.to_h).to eq(
+      path: [:discount], field: :discount, code: :too_small, validator: :min, value: -5, expected: 0,
+    )
+  end
+
+  it "serializes a minimal error to just path, field, and code" do
+    expect(described_class.new(path: [:salary], code: :not_positive).to_h)
+      .to eq(path: [:salary], field: :salary, code: :not_positive)
   end
 
   it "compares by value" do
-    twin = described_class.new(
-      field: :salary,
-      path: [:employee, :salary],
-      code: :invalid_currency,
-      input: "$abc",
-    )
-    expect(error).to eq(twin)
+    a = described_class.new(path: [:x], code: :bad, validator: :min, expected: 0)
+    b = described_class.new(path: [:x], code: :bad, validator: :min, expected: 0)
+    expect(a).to eq(b)
   end
 end

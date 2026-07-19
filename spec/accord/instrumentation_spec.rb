@@ -12,8 +12,9 @@ RSpec.describe "permissive-parse instrumentation" do
   let(:schema) do
     Class.new(Accord::Schema) do
       string :name, required: true
-      currency :salary
-      validate(:salary) { |salary| error(:must_be_positive) if salary.negative? }
+      currency :salary do
+        validate(:must_be_positive) { |salary| error(:must_be_positive) if salary.negative? }
+      end
     end
   end
 

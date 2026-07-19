@@ -6,105 +6,111 @@ require_relative "fields/scalar"
 require_relative "fields/object"
 require_relative "fields/array"
 require_relative "fields/money"
-require_relative "validation"
 require_relative "types/string"
 require_relative "types/uuid"
 require_relative "types/iso_currency"
 require_relative "types/boolean"
+require_relative "types/integer"
 require_relative "types/date"
 require_relative "types/decimal"
 require_relative "types/currency"
 require_relative "types/duration"
+require_relative "types/percentage"
 
 module Accord
   # A schema is the source of truth for an API boundary. The class declares the
-  # contract (fields + validations); an instance IS the parsed, typed result —
-  # accessors return coerced values directly, with no wrappers.
+  # contract (fields + declarative validators); an instance IS the parsed, typed
+  # result — accessors return coerced values directly, with no wrappers.
   #
   #   class CreateEmployee < Accord::Schema
   #     string :name, required: true
   #     boolean :active, default: true
-  #     currency :salary
-  #
-  #     validate(:salary) { |salary| error(:must_be_positive) if salary.negative? }
+  #     currency :salary do
+  #       positive
+  #     end
   #   end
   #
   #   input = CreateEmployee.parse(params)
   #   input.valid?   # => true / false
   #   input.name     # => "Ada"
   #   input.errors   # => [Accord::Error, ...]
+  #
+  # Validation is declared in field blocks — see Field::Configurator.
   class Schema
     class << self
       def fields
         @fields ||= {}
       end
 
-      def validations
-        @validations ||= []
-      end
-
-      # Subclasses inherit a copy of declared fields/validations so extending a
-      # schema doesn't mutate its parent.
+      # Subclasses inherit a copy of declared fields so extending a schema
+      # doesn't mutate its parent.
       def inherited(subclass)
         super
         subclass.instance_variable_set(:@fields, fields.dup)
-        subclass.instance_variable_set(:@validations, validations.dup)
       end
 
-      def string(name, **opts)
-        field(name, Types::String.new, **opts)
+      def string(name, **opts, &block)
+        field(name, Types::String.new, **opts, &block)
       end
 
-      def uuid(name, version: nil, **opts)
-        field(name, Types::UUID.new(version:), **opts)
+      def uuid(name, version: nil, **opts, &block)
+        field(name, Types::UUID.new(version:), **opts, &block)
       end
 
-      def iso_currency(name, **opts)
-        field(name, Types::ISOCurrency.new, **opts)
+      def iso_currency(name, **opts, &block)
+        field(name, Types::ISOCurrency.new, **opts, &block)
       end
 
-      def boolean(name, **opts)
-        field(name, Types::Boolean.new, **opts)
+      def boolean(name, **opts, &block)
+        field(name, Types::Boolean.new, **opts, &block)
       end
 
-      def date(name, formats: [], **opts)
-        field(name, Types::Date.new(formats:), **opts)
+      def integer(name, **opts, &block)
+        field(name, Types::Integer.new, **opts, &block)
       end
 
-      def decimal(name, scale: Types::Decimal::DEFAULT_SCALE, round: false, **opts)
-        field(name, Types::Decimal.new(scale:, round:), **opts)
+      def date(name, formats: [], **opts, &block)
+        field(name, Types::Date.new(formats:), **opts, &block)
       end
 
-      def currency(name, scale: 2, round: false, **opts)
-        field(name, Types::Currency.new(scale:, round:), **opts)
+      def decimal(name, scale: Types::Decimal::DEFAULT_SCALE, round: false, **opts, &block)
+        field(name, Types::Decimal.new(scale:, round:), **opts, &block)
       end
 
-      def duration(name, unit: :hours, scale: 2, round: false, **opts)
-        field(name, Types::Duration.new(unit:, scale:, round:), **opts)
+      def currency(name, scale: 2, round: false, **opts, &block)
+        field(name, Types::Currency.new(scale:, round:), **opts, &block)
+      end
+
+      def duration(name, unit: :hours, scale: 2, round: false, **opts, &block)
+        field(name, Types::Duration.new(unit:, scale:, round:), **opts, &block)
+      end
+
+      def percentage(name, scale: 2, round: false, **opts, &block)
+        field(name, Types::Percentage.new(scale:, round:), **opts, &block)
       end
 
       # A nested schema. The parsed value is a sub-schema instance.
       #   object :address, Address
-      def object(name, schema, **opts)
-        register(ObjectField.new(name:, schema:, **opts))
+      def object(name, schema, **opts, &block)
+        register(ObjectField.new(name:, schema:, **opts).configure(&block))
       end
 
       # A list of nested schemas. Each element is parsed through `schema`.
       #   array :employees, Employee
-      def array(name, schema, **opts)
-        register(ArrayField.new(name:, schema:, **opts))
+      def array(name, schema, **opts, &block)
+        register(ArrayField.new(name:, schema:, **opts).configure(&block))
       end
 
       # An amount + currency parsed into a money-gem Money value.
       #   money :salary
-      def money(name, **opts)
-        register(MoneyField.new(name:, **opts))
+      def money(name, **opts, &block)
+        register(MoneyField.new(name:, **opts).configure(&block))
       end
 
       # Declare a scalar field backed by a Type. Public so custom types can be
-      # registered directly.
-      def field(name, type, **opts)
-        register(ScalarField.new(name:, type:, **opts))
+      # registered directly. An optional block configures validators.
+      def field(name, type, **opts, &block)
+        register(ScalarField.new(name:, type:, **opts).configure(&block))
       end
 
       # Register a field and define its reader.
@@ -112,11 +118,6 @@ module Accord
         fields[field.name] = field
         define_method(field.name) { @values[field.name] }
         field.name
-      end
-
-      def validate(field = nil, &block)
-        validations << Validation.new(field, block)
-        self
       end
 
       # Parse untrusted input into a typed schema instance.
@@ -186,52 +187,16 @@ module Accord
       @values[name]
     end
 
-    # Called during validation blocks to record a structured error.
-    #   error(:code)                  # field-scoped validation
-    #   error(:code, field: :salary)  # explicit field
-    def error(code, field: @current_field)
-      path = @path + [field].compact
-      Accord.instrument(code, field:, path:, input: nil)
-      @errors << Error.new(field:, path:, code:, value: field && @values[field])
-    end
-
-    # @api private — orchestrates coercion + validation. Public so
-    # Schema.parse can drive a freshly-allocated instance.
+    # @api private — resolves every field (coerce → validate) and aggregates the
+    # errors. Public so Schema.parse can drive a freshly-allocated instance.
     def _parse(input, strict:, path:)
-      @path = path
-
       self.class.fields.each_value do |field|
         result = field.resolve(input, strict:, path:)
         @values[field.name] = result.value
         @errors.concat(result.errors)
       end
 
-      run_validations
       self
-    end
-
-    private
-
-    # Validations run in declaration order, after all fields are coerced.
-    # A field-scoped validation is skipped when its field is absent/nil or
-    # already failed coercion — the rule can assume a usable value.
-    def run_validations
-      self.class.validations.each do |validation|
-        if validation.scoped?
-          next if failed?(validation.field) || @values[validation.field].nil?
-
-          @current_field = validation.field
-          instance_exec(@values[validation.field], &validation.block)
-        else
-          @current_field = nil
-          instance_exec(&validation.block)
-        end
-      end
-      @current_field = nil
-    end
-
-    def failed?(field)
-      @errors.any? { |e| e.field == field }
     end
   end
 end

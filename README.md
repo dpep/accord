@@ -56,10 +56,12 @@ Each type implements a common interface: `parse` (permissive), `parse!` (strict)
 | `string`   | String, Symbol, Numeric        | String                     | `String` |
 | `uuid`     | RFC 4122 UUID (any case)       | RFC 4122 UUID              | `String` (canonical lowercase) |
 | `boolean`  | `true`/`false`, `"true"`/`"false"`, `"1"`/`"0"`, `"yes"`/`"no"` | `true`/`false` | `true`/`false` |
+| `integer`  | Integer, integer strings, whole Floats | Integer            | `Integer` |
 | `date`     | Date, Time, ISO-8601, configured legacy `formats:` | Date, Time, ISO-8601 | `Date` |
 | `decimal`  | numeric strings, Integer, Float | numeric strings, Integer  | `BigDecimal` |
 | `currency` | `"10"`, `"$10.50"`, `"1,000.00"`, Integer, Float | plain numeric strings, Integer | `BigDecimal` |
 | `duration` | plain numbers                  | plain numbers, Integer     | `BigDecimal` |
+| `percentage` | plain numbers                | plain numbers, Integer     | `BigDecimal` |
 
 Decimals are always `BigDecimal`, never `Float` — Floats are rejected in strict mode and routed through their string form otherwise, so binary rounding never enters the pipeline. `decimal`/`currency`/`duration` take a `scale:` (decimal places), enforced on parse; excess precision is rejected unless `round: true` is set. `dump` renders exactly `scale` places.
 
@@ -70,7 +72,8 @@ The type system is a small set of primitives (`String`, `Boolean`, `Date`, `Deci
 ```
 String              Decimal            Composite
 ├── UUID            ├── Currency       └── Money  (Decimal + ISOCurrency)
-└── ISOCurrency     └── Duration
+└── ISOCurrency     ├── Duration
+                    └── Percentage
 ```
 
 ```ruby
@@ -148,14 +151,41 @@ Required and defaulted fields are non-nilable; optional fields are nilable (the 
 
 **Steep** consumes the `.rbs` directly — write it into `sig/`. **Sorbet** reads RBI, so Accord also projects `Schema.rbi` and ships a **Tapioca DSL compiler**: in a project with `tapioca`, `tapioca dsl` auto-discovers it and generates typed reader RBI for every schema — no manual conversion. Both paths share one type mapping (`Field#sorbet_return` / `#rbs_return`).
 
+## Validation
+
+Validation is declarative — rules are declared in field blocks and produce structured errors, never messages. The lifecycle is per-field and never fails fast: **parse → canonicalize → validate → collect → continue**, so every error surfaces in one pass.
+
+```ruby
+class CreateEmployee < Accord::Schema
+  string :name do
+    required
+    length 1..100
+  end
+
+  integer :age do
+    between 18..120
+  end
+
+  currency :salary do
+    positive
+    validate(:increment) { |v| error(:bad_increment) unless (v % 100).zero? }  # custom inline
+  end
+
+  string :status do
+    inclusion %w[pending approved rejected]
+  end
+end
+```
+
+Built-in validators: `required`, `min`, `max`, `between`, `positive`, `negative`, `non_zero`, `length`, `inclusion`, `exclusion`, `format`. Custom rules are inline `validate` blocks or reusable `Accord::Validators::Base` subclasses (`validator MyValidator`). Validators are introspectable (`CreateEmployee.fields[:salary].validators`) and contribute OpenAPI (`between 0..100` → `minimum`/`maximum`, `length 1..50` → `minLength`/`maxLength`, `inclusion [...]` → `enum`).
+
 ## Errors
 
-Errors are first-class objects (`Accord::Error`) carrying `field`, `path`, `code`, `message`, `input`, and `value`. Paths are arrays so nested schemas (coming next) can point at `[:employees, 2, :salary]`.
+Errors are first-class structured data (`Accord::Error`) — never rendered strings. Each carries `path`, `code`, `field` (the last path segment), and, for validation failures, `validator`, `value`, and validator-specific metadata (`expected`, `min`, `max`, …). Rendering (Rails JSON, GraphQL, i18n, logs) is a separate concern. Paths are arrays, so nested schemas point at `[:employees, 2, :salary]` with no special handling.
 
 ```ruby
 input.errors.first.to_h
-# => { field: :salary, path: [:salary], code: :invalid_currency,
-#      message: "invalid_currency", input: "$abc", value: nil }
+# => { path: [:discount], field: :discount, code: :too_small, validator: :min, value: -5, expected: 0 }
 ```
 
 ## Rails integration

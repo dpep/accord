@@ -98,7 +98,8 @@ module Accord
       errors = amount.errors + currency.errors
       return Result.new(nil, errors) unless errors.empty?
 
-      Result.new(Money.from_amount(amount.value, currency.value), errors)
+      money = Money.from_amount(amount.value, currency.value)
+      Result.new(money, validate_value(money, path))
     end
 
     def resolve_currency(input, strict:, path:)

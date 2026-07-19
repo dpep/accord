@@ -16,6 +16,7 @@ module Accord
 
     def openapi
       schema = type.openapi.dup
+      validators.each { |validator| schema.merge!(validator.openapi) }
       schema[:description] = description if description
       schema[:example] = example unless example.nil?
       schema

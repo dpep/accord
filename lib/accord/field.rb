@@ -1,13 +1,15 @@
 # frozen_string_literal: true
 
 require_relative "errors"
+require_relative "validators"
 
 module Accord
   # A declared field on a schema: a name bound to a kind of value plus options
-  # (required, default, description, example). This base class owns the
-  # presence/default/required policy shared by every field kind; subclasses
-  # (ScalarField, ObjectField, ArrayField) implement #coerce_present to turn a
-  # present raw value into a coerced value plus any nested errors.
+  # (required, default, description, example) and declarative validators. This
+  # base class owns the presence/default/required policy and the validation
+  # lifecycle shared by every field kind; subclasses (ScalarField, ObjectField,
+  # ArrayField) implement #coerce_present to turn a present raw value into a
+  # coerced value plus any nested errors.
   class Field
     # The outcome of resolving one field: its coerced value and the structured
     # errors produced beneath it. Errors accumulate rather than raise so a
@@ -17,23 +19,36 @@ module Accord
       def self.failed(error) = new(nil, [error])
     end
 
-    attr_reader :name, :default, :description, :example
+    attr_reader :name, :default, :description, :example, :validators
 
     def initialize(name:, required: false, default: nil, description: nil, example: nil)
       @name = name
-      @required = required
       @default = default
       @description = description
       @example = example
       @has_default = !default.nil?
+      @validators = []
+      @validators << Validators::Required.new if required
     end
 
+    # Required, defaulted, and validation state all live as declarative metadata.
     def required?
-      @required
+      @validators.any?(Validators::Required)
     end
 
     def has_default?
       @has_default
+    end
+
+    def add_validator(validator)
+      @validators << validator
+      self
+    end
+
+    # Evaluate a field block, registering validators via the Configurator DSL.
+    def configure(&block)
+      Configurator.new(self).instance_exec(&block) if block
+      self
     end
 
     # Read this field's raw value from an input hash, tolerating string or
@@ -46,9 +61,10 @@ module Accord
       [false, nil]
     end
 
-    # Resolve this field against raw input. Applies presence/default/required
-    # policy, then delegates a present value to #coerce_present. In strict mode
-    # failures raise; otherwise they are collected into the Result.
+    # Resolve this field against raw input: presence/default/required, then
+    # coerce a present value (#coerce_present), then run validators on the
+    # coerced value. Coercion failures raise in strict mode; validation always
+    # collects (never fails fast) so every error surfaces in one pass.
     def resolve(input, strict:, path:)
       present, raw = read(input)
 
@@ -60,7 +76,10 @@ module Accord
         return Result.ok(nil)
       end
 
-      coerce_present(raw, strict:, path:)
+      result = coerce_present(raw, strict:, path:)
+      return result unless result.errors.empty?
+
+      Result.new(result.value, validate_value(result.value, path))
     end
 
     def openapi
@@ -105,6 +124,27 @@ module Accord
       default.respond_to?(:call) ? default.call : default
     end
 
+    # Run this field's validators over a coerced value, collecting structured
+    # errors. Never raises — aggregation is the whole point.
+    def validate_value(value, path)
+      return [] if value.nil?
+
+      validators.flat_map do |validator|
+        collector = Validators::Collector.new
+        validator.validate(value, collector)
+        collector.violations.map do |violation|
+          validation_error(path, validator, value, violation)
+        end
+      end
+    end
+
+    def validation_error(path, validator, value, violation)
+      code = violation[:code]
+      full_path = path + [name]
+      Accord.instrument(code, path: full_path, field: name, validator: validator.name, value:)
+      Error.new(path: full_path, field: name, code:, validator: validator.name, value:, **violation[:metadata])
+    end
+
     # Build an Accord::Error located at this field (path + this field's name).
     def error(path, code, input: nil)
       build_error(path: path + [name], code:, input:)
@@ -128,6 +168,44 @@ module Accord
 
       sub = schema.parse(raw, strict:, path:)
       [sub, sub.errors]
+    end
+
+    # The field-block DSL. Each method registers a declarative validator on the
+    # field; `validate`/`validator` add custom rules.
+    #
+    #   currency :salary do
+    #     positive
+    #     validate(:increment) { |v| error(:bad) unless (v % 100).zero? }
+    #   end
+    class Configurator
+      def initialize(field)
+        @field = field
+      end
+
+      def required
+        @field.add_validator(Validators::Required.new) unless @field.required?
+      end
+
+      def positive = @field.add_validator(Validators::Positive.new)
+      def negative = @field.add_validator(Validators::Negative.new)
+      def non_zero = @field.add_validator(Validators::NonZero.new)
+      def min(value) = @field.add_validator(Validators::Min.new(value))
+      def max(value) = @field.add_validator(Validators::Max.new(value))
+      def between(range) = @field.add_validator(Validators::Between.new(range))
+      def length(range) = @field.add_validator(Validators::Length.new(range))
+      def inclusion(values) = @field.add_validator(Validators::Inclusion.new(values))
+      def exclusion(values) = @field.add_validator(Validators::Exclusion.new(values))
+      def format(pattern) = @field.add_validator(Validators::Format.new(pattern))
+
+      # Custom inline rule: validate(:code) { |value| error(:x) unless ... }
+      def validate(name, &block)
+        @field.add_validator(Validators::Custom.new(name, block))
+      end
+
+      # Reusable validator: a Validators::Base subclass or instance.
+      def validator(validator)
+        @field.add_validator(validator.is_a?(Class) ? validator.new : validator)
+      end
     end
   end
 end

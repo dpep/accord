@@ -2,34 +2,33 @@
 
 module Accord
   # A first-class, structured description of a single parse or validation
-  # failure. These are what a schema collects and what a controller renders.
+  # failure — data, never a rendered message. Rendering (Rails JSON, GraphQL,
+  # i18n, logs) is a separate concern.
   #
   #   Accord::Error.new(
-  #     path: [:employees, 2, :salary],
-  #     code: :invalid_currency,
-  #     input: "$abc",
+  #     path: [:discount], code: :too_small, validator: :min, value: -5, expected: 0,
   #   )
+  #
+  # Always carries path, code, and (for validation failures) validator + value +
+  # validator-specific metadata (expected, min, max, …). `field` defaults to the
+  # last path segment. `**metadata` captures any validator-specific keys.
   class Error
-    attr_reader :field, :path, :code, :message, :input, :value
+    attr_reader :path, :code, :field, :validator, :value, :input, :metadata
 
-    def initialize(field:, path:, code:, message: nil, input: nil, value: nil)
-      @field = field
+    def initialize(path:, code:, field: nil, validator: nil, value: nil, input: nil, **metadata)
       @path = path
       @code = code
-      @message = message || code.to_s
-      @input = input
+      @field = field.nil? ? path.last : field
+      @validator = validator
       @value = value
+      @input = input
+      @metadata = metadata
     end
 
+    # Structured data with nil-valued keys dropped — the minimal machine-readable
+    # form (`{ path:, code: }`) up to the full validator error.
     def to_h
-      {
-        field:,
-        path:,
-        code:,
-        message:,
-        input:,
-        value:,
-      }
+      { path:, field:, code:, validator:, value:, input:, **metadata }.compact
     end
     alias as_json to_h
 
