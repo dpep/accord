@@ -85,6 +85,14 @@ CreateOrder.graphql_schemas.values.join("\n\n")   # AddressInput, LineItemInput,
 
 `ISO8601Date`/`ISO8601DateTime` are graphql-ruby's date scalars; if you don't use them, treat those fields as `String`. Runnable example: [`examples/graphql.rb`](../examples/graphql.rb).
 
+Dump the SDL for every declared input type in a script:
+
+```ruby
+schemas = Accord::Schema.descendants.select(&:name)   # or list them explicitly
+sdl = schemas.each_with_object({}) { |s, into| s.graphql_schemas(into) }.values.join("\n\n")
+File.write("inputs.graphql", sdl)
+```
+
 ## RABL
 
 RABL serializes objects **out**; Accord parses input **in**. They sit at opposite ends of a request: Accord turns untrusted params into typed values, your domain logic computes a result, and RABL renders that result. The values flow through the middle with their types intact.

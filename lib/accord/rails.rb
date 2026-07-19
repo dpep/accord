@@ -19,6 +19,10 @@ module Accord
           include Accord::ControllerHelpers
         end
       end
+
+      rake_tasks do
+        load File.expand_path("tasks/accord.rake", __dir__)
+      end
     end
   end
 end

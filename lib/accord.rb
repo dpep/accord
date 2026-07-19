@@ -67,6 +67,12 @@ module Accord
       schemas.each_with_object({}) { |schema, into| schema.openapi_schemas(into) }
     end
 
+    # A combined RBS document for the given schemas (default: every declared
+    # schema), ready to write to `sig/`. Backs the `accord:rbs` rake task.
+    def rbs_document(schemas = Schema.descendants.select(&:name))
+      "#{schemas.uniq.sort_by(&:name).map(&:rbs).join("\n\n")}\n"
+    end
+
     # Lazily load the optional `money` gem, which backs the money and
     # iso_currency types. Raises a helpful error if it isn't installed.
     def require_money!

@@ -71,4 +71,15 @@ RSpec.describe "RBS projection" do
       expect { Class.new(Accord::Schema).rbs }.to raise_error(ArgumentError)
     end
   end
+
+  describe "Accord.rbs_document" do
+    it "concatenates the given schemas' RBS, sorted by name" do
+      stub_const("Beta", Class.new(Accord::Schema) { string :b, required: true })
+      stub_const("Alpha", Class.new(Accord::Schema) { string :a, required: true })
+
+      document = Accord.rbs_document([Beta, Alpha])
+
+      expect(document).to eq("#{Alpha.rbs}\n\n#{Beta.rbs}\n")
+    end
+  end
 end

@@ -44,6 +44,14 @@ module Accord
         subclass.instance_variable_set(:@fields, fields.dup)
       end
 
+      # Every schema descending from this one (recursively) — the discovery hook
+      # for bulk export (RBS, OpenAPI, ...). Includes anonymous schemas (inline
+      # controller inputs, one-offs); filter on `name` for just declared classes:
+      #   Accord::Schema.descendants.select(&:name)
+      def descendants
+        subclasses.flat_map { |subclass| [subclass, *subclass.descendants] }
+      end
+
       # Define a scalar DSL method for a registered type name (called for each
       # built-in at load, and by Accord::Types.register for custom types). After
       # the name come positional validator flags, then keyword options, then an

@@ -189,6 +189,17 @@ RSpec.describe Accord::Schema do
     end
   end
 
+  describe ".descendants" do
+    it "collects schemas descending from a root, recursively" do
+      stub_const("Parent", Class.new(described_class))
+      stub_const("Child", Class.new(Parent))
+      stub_const("Grandchild", Class.new(Child))
+
+      expect(Parent.descendants).to contain_exactly(Child, Grandchild)
+      expect(described_class.descendants).to include(Parent, Child, Grandchild)
+    end
+  end
+
   describe ".field" do
     it "declares a scalar field backed by an explicit type instance" do
       klass = Class.new(described_class) { field :code, Accord::Types::UUID.new, :required }

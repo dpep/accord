@@ -80,6 +80,17 @@ CreateEmployee.rbi
 schema.rbs(class_name: "CreateEmployee")
 ```
 
+## Exporting RBS to `sig/`
+
+For RBI, Sorbet's standard flow already covers you — Accord ships a Tapioca DSL compiler, so `bundle exec tapioca dsl` writes RBI under `sorbet/rbi/dsl/`. RBS has no such generator, so Accord provides a rake task:
+
+```sh
+bundle exec rake accord:rbs            # -> sig/accord.rbs (every declared schema)
+OUTPUT=sig/inputs.rbs bundle exec rake accord:rbs
+```
+
+Under Rails the task is auto-registered (it eager-loads the app first). Outside Rails, `require "accord/rake"` in your `Rakefile` and make sure your schemas are loaded. Discovery is `Accord::Schema.descendants.select(&:name)` — the same hook you can use directly to build a custom export.
+
 ---
 
 See also: [getting_started.md](getting_started.md) · [types.md](types.md)

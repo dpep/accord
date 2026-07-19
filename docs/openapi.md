@@ -115,6 +115,20 @@ The result is a single OpenAPI document whose request/response schemas are gener
 
 > **Keeping it in sync.** Because the components come from `Accord.openapi_schemas(...)`, adding a field or a validator updates the generated doc automatically — no hand-maintained schema YAML to drift.
 
+## Exporting the components to a file
+
+Accord builds the `components.schemas` map (not paths — those are your routes' concern). Write it out in a rake task or script; discover every declared schema with `Accord::Schema.descendants`:
+
+```ruby
+require "json"
+
+schemas = Accord::Schema.descendants.select(&:name)   # or list them explicitly
+components = { components: { schemas: Accord.openapi_schemas(*schemas) } }
+File.write("openapi.components.json", JSON.pretty_generate(components))
+```
+
+Merge that under your hand-written `paths`/`info`, or let rswag assemble the full document from request specs (above).
+
 ---
 
 See also: [validation.md](validation.md) · [types.md](types.md) · [rails.md](rails.md)
