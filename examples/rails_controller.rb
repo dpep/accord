@@ -20,7 +20,6 @@ class CreateEmployee < Accord::Schema
   date     :hired_on
 
   # Block form: reach for it when a field needs several rules or a custom check.
-  # (The keyword shorthand — `format:`, `length:`, ... — covers the simple ones.)
   string :email, :required do
     format(/\A[^@\s]+@[^@\s]+\z/)
     length 5..255
@@ -43,19 +42,17 @@ end
 # --- app/controllers/employees_controller.rb ---------------------------------
 
 class EmployeesController < ApplicationController
-  # An inline schema for a simple, single-use input. `from: :q` names a params
-  # key (Symbol); nil reads all of `params`, a proc handles anything else.
-  accord :search, from: :q do
+  # Three inputs, three source styles:
+  accord :employee, CreateEmployee                        # (1) default — reads `params`
+  accord :search, from: :q do                             # (2) Symbol — reads params[:q]
     string  :name
     boolean :active
   end
+  # (3) proc — reaches what a key can't: a JSON:API body nests the attributes
+  # under data/attributes. Same schema, different wire shape.
+  accord :imported, CreateEmployee, from: -> { params.dig(:data, :attributes) }
 
-  # A proc reaches a source a single key can't — here a JSON:API body whose
-  # attributes are nested under data/attributes.
-  accord :employee, CreateEmployee, from: -> { params.dig(:data, :attributes) }
-
-  # POST /employees
-  #   { "data": { "attributes": { "name": "Ada", "email": "ada@x.co", "salary": "$65,000" } } }
+  # POST /employees  { "name": "Ada", "email": "ada@x.co", "salary": "$65,000" }
   # -> 201 (active defaults to true, role to "member"), or 422 if invalid.
   def create
     render json: Employee.create!(employee.to_h), status: :created  # typed; 422 if invalid
@@ -67,6 +64,11 @@ class EmployeesController < ApplicationController
     scope = scope.where("name ILIKE ?", "%#{search.name}%") if search.name
     scope = scope.where(active: search.active)              unless search.active.nil?
     render json: scope
+  end
+
+  # POST /employees/import  { "data": { "attributes": { "name": "Ada", ... } } }
+  def import
+    render json: Employee.create!(imported.to_h), status: :created
   end
 end
 

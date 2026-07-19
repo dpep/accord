@@ -58,6 +58,18 @@ RSpec.describe "GraphQL projection" do
     it "raises for an anonymous schema without a type_name" do
       expect { Class.new(Accord::Schema).graphql }.to raise_error(ArgumentError)
     end
+
+    it "flattens namespace separators into a valid GraphQL name" do
+      stub_const("Api::CreateEmployee", Class.new(Accord::Schema) { string :name, :required })
+
+      expect(Api::CreateEmployee.graphql).to include("input Api_CreateEmployeeInput {")
+    end
+
+    it "does not double an existing Input suffix" do
+      stub_const("EmployeeInput", Class.new(Accord::Schema) { string :name, :required })
+
+      expect(EmployeeInput.graphql).to include("input EmployeeInput {")
+    end
   end
 
   describe "Schema.graphql_schemas" do

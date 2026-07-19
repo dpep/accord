@@ -179,10 +179,15 @@ module Accord
         ["input #{type_name} {", *lines, "}"].join("\n")
       end
 
-      # The conventional GraphQL input type name for this schema (its class name
-      # suffixed with `Input`), or nil for an anonymous schema.
+      # The conventional GraphQL input type name for this schema, or nil for an
+      # anonymous schema. Namespace separators are flattened (`Api::Employee` ->
+      # `Api_Employee`) since `::` isn't legal in a GraphQL name, and the `Input`
+      # suffix is added unless the name already carries it.
       def graphql_input_name
-        "#{name}Input" if name
+        return unless name
+
+        base = name.gsub("::", "_")
+        base.end_with?("Input") ? base : "#{base}Input"
       end
 
       # Every named GraphQL input type in this schema's graph (itself plus nested
