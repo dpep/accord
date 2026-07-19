@@ -221,6 +221,13 @@ module Accord
       @values.dup
     end
 
+    # The canonical external representation — the inverse of parse. Scalars dump
+    # to canonical strings, nested schemas recurse. `to_h` gives the internal
+    # (typed) values; `dump` gives the external (serializable) ones.
+    def dump
+      self.class.fields.transform_values { |field| field.dump(@values[field.name]) }
+    end
+
     def [](name)
       @values[name]
     end

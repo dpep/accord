@@ -51,16 +51,7 @@ module Accord
     # doesn't fit. Presence/default/required policy mirrors the base template.
     def resolve(input, strict:, path:)
       present, raw = read(input)
-
-      if !present || raw.nil?
-        return Result.ok(resolve_default) if has_default?
-        raise MissingField, name if required? && strict
-        return Result.failed(error(path, :required)) if required?
-
-        return Result.ok(nil)
-      end
-
-      coerce_money(input, raw, strict:, path:)
+      resolve_absent(present, raw, strict:, path:) || coerce_money(input, raw, strict:, path:)
     end
 
     def dump(value)

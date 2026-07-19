@@ -22,6 +22,10 @@ module Accord
       schema
     end
 
+    def dump(value)
+      type.dump(value)
+    end
+
     def rbs
       type.rbs
     end

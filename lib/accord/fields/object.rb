@@ -20,6 +20,10 @@ module Accord
       openapi_ref(schema)
     end
 
+    def dump(value)
+      value&.dump
+    end
+
     def nested_schema
       schema
     end

@@ -20,6 +20,10 @@ module Accord
       { type: "array", items: openapi_ref(schema) }
     end
 
+    def dump(value)
+      value&.map(&:dump)
+    end
+
     def nested_schema
       schema
     end

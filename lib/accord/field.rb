@@ -67,19 +67,19 @@ module Accord
     # collects (never fails fast) so every error surfaces in one pass.
     def resolve(input, strict:, path:)
       present, raw = read(input)
-
-      if !present || raw.nil?
-        return Result.ok(resolve_default) if has_default?
-        raise MissingField, name if required? && strict
-        return Result.failed(error(path, :required)) if required?
-
-        return Result.ok(nil)
-      end
+      absent = resolve_absent(present, raw, strict:, path:)
+      return absent if absent
 
       result = coerce_present(raw, strict:, path:)
       return result unless result.errors.empty?
 
       Result.new(result.value, validate_value(result.value, path))
+    end
+
+    # The canonical external representation of a coerced value — the inverse of
+    # parse. Overridden per field kind; the base is identity (e.g. booleans).
+    def dump(value)
+      value
     end
 
     def openapi
@@ -126,6 +126,19 @@ module Accord
     end
 
     private
+
+    # Handle the absent/default/required case. Returns a Result when the field
+    # is absent (its default, a :required error, or nil), or nil when a value is
+    # present and should be coerced. Shared by Field#resolve and the composite
+    # MoneyField#resolve.
+    def resolve_absent(present, raw, strict:, path:)
+      return if present && !raw.nil?
+      return Result.ok(resolve_default) if has_default?
+      raise MissingField, name if required? && strict
+      return Result.failed(error(path, :required)) if required?
+
+      Result.ok(nil)
+    end
 
     # @abstract Coerce a present (non-nil) raw value into a Result.
     def coerce_present(_raw, strict:, path:)
