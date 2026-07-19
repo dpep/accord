@@ -14,17 +14,10 @@ module Tapioca
       # Generates RBI for Accord::Schema subclasses so Sorbet knows the return
       # types of the dynamically-defined field readers. Reuses the same
       # per-field type mapping as Schema#rbs / Schema#rbi (Field#sorbet_return).
-      class AccordSchema < Tapioca::Dsl::Compiler
-        extend T::Sig
-
-        ConstantType = type_member { { fixed: T.class_of(Accord::Schema) } }
-
-        sig { override.returns(T::Enumerable[Module]) }
-        def self.gather_constants
-          descendants_of(Accord::Schema).reject { |klass| klass.name.nil? }
-        end
-
-        sig { override.void }
+      #: [ConstantType = singleton(::Accord::Schema)]
+      class AccordSchema < Compiler
+        # @override
+        #: -> void
         def decorate
           return if constant.fields.empty?
 
@@ -32,6 +25,14 @@ module Tapioca
             constant.fields.each_value do |field|
               klass.create_method(field.name.to_s, return_type: field.sorbet_return)
             end
+          end
+        end
+
+        class << self
+          # @override
+          #: -> T::Enumerable[Module]
+          def gather_constants
+            descendants_of(::Accord::Schema).reject { |klass| klass.name.nil? }
           end
         end
       end

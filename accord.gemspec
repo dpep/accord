@@ -30,4 +30,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "activesupport"
   spec.add_development_dependency "money"
   spec.add_development_dependency "rspec", "~> 3.0"
+  spec.add_development_dependency "tapioca"
 end
