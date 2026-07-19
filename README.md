@@ -1,4 +1,8 @@
-# Accord
+accord
+======
+![Gem](https://img.shields.io/gem/dt/accord?style=plastic)
+[![codecov](https://codecov.io/gh/dpep/accord/branch/main/graph/badge.svg)](https://codecov.io/gh/dpep/accord)
+
 
 Executable API contracts for Ruby.
 
@@ -6,11 +10,9 @@ A schema is the source of truth for an API boundary. One declaration describes t
 
 ```ruby
 class CreateEmployee < Accord::Schema
-  string :name, required: true
+  string :name, :required
   boolean :active, default: true
-  currency :salary
-
-  validate(:salary) { |salary| error(:must_be_positive) if salary.negative? }
+  currency :salary, :positive
 end
 
 input = CreateEmployee.parse(params)
@@ -27,8 +29,24 @@ Accessors return coerced values directly — no wrappers:
 ```ruby
 input.name    # => "Ada"
 input.active  # => true
-input.salary  # => #<BigDecimal ...>
+input.salary  # => BigDecimal("1000.00")
 ```
+
+
+----
+## Installation
+
+```ruby
+# Gemfile
+gem "accord"
+```
+
+or
+
+```
+gem install accord
+```
+
 
 ## Parsing modes
 
@@ -38,7 +56,7 @@ Two modes, one coercion engine.
 
 ```ruby
 input = CreateEmployee.parse({ salary: "$1,000.00" })
-input.salary            # => 0.1e4 (BigDecimal)
+input.salary            # => BigDecimal("1000.00")
 ```
 
 **Strict** (`parse(..., strict: true)`) — for trusted callers. Raises on the first invalid value or missing required field.
@@ -260,23 +278,6 @@ ActiveSupport::Notifications.subscribe(/accord\.parse/) do |name, *, payload|
   # name    => "accord.parse.invalid_currency"
   # payload => { field: :salary, path: [:salary], input: "$abc" }
 end
-```
-
-## Roadmap
-
-- **Milestone 1 — Core types** ✅ Schema, Field, typed input object, String / Boolean / Date / Currency, Error objects. No Rails dependency.
-- **Milestone 2 — Nested schemas** ✅ `object` and `array` fields, nested error paths.
-- **Milestone 3 — Rails integration** ✅ controller helpers, `ActiveSupport::Notifications`, params handling. _Refinement in progress: declarative macro, default-mode config, overridable rendering._
-- **Milestone 4 — Typing projection** ✅ `Schema.rbs` generates RBS signatures for the parsed result, so `input.salary` is a known `BigDecimal` to Sorbet/Steep/editors — no runtime dependency.
-- **Milestone 5 — OpenAPI** generate OpenAPI components from a schema.
-
-Typing and OpenAPI are both *projections* of the schema — see [docs/design.md](docs/design.md).
-
-## Development
-
-```sh
-bundle install
-bundle exec rspec
 ```
 
 ## License

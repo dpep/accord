@@ -1,34 +1,23 @@
-# frozen_string_literal: true
-
 require_relative "lib/accord/version"
 
-Gem::Specification.new do |spec|
-  spec.name = "accord"
-  spec.version = Accord::VERSION
-  spec.authors = ["Daniel Pepper"]
-  spec.email = ["pepper.daniel@gmail.com"]
+Gem::Specification.new do |s|
+  s.authors     = ["Daniel Pepper"]
+  s.description = "A declarative DSL for defining input schemas that parse, validate, and document API boundaries."
+  s.files       = `git ls-files * ':!:spec'`.split("\n")
+  s.homepage    = "https://github.com/dpep/accord"
+  s.license     = "MIT"
+  s.name        = "accord"
+  s.summary     = "Executable API contracts for Ruby"
+  s.version     = Accord::VERSION
 
-  spec.summary = "Executable API contracts for Ruby."
-  spec.description = "A declarative DSL for defining input schemas that parse, " \
-                     "validate, and document API boundaries."
-  spec.homepage = "https://github.com/dpep/accord"
-  spec.license = "MIT"
-  spec.required_ruby_version = ">= 3.1"
+  s.required_ruby_version = ">= 3.3"
 
-  spec.metadata["homepage_uri"] = spec.homepage
-  spec.metadata["source_code_uri"] = spec.homepage
+  s.add_dependency "bigdecimal"
 
-  spec.files = Dir["lib/**/*.rb", "README.md", "LICENSE*"]
-  spec.require_paths = ["lib"]
-
-  # bigdecimal and date back the Decimal and Date types.
-  spec.add_dependency "bigdecimal"
-
-  # money is an OPTIONAL dependency: only the `money` and `iso_currency` types
-  # need it, and they require it lazily. Apps using those types add `gem "money"`
-  # themselves; the core gem stays lean and framework-agnostic.
-  spec.add_development_dependency "activesupport"
-  spec.add_development_dependency "money"
-  spec.add_development_dependency "rspec", "~> 3.0"
-  spec.add_development_dependency "tapioca"
+  s.add_development_dependency "activesupport"
+  s.add_development_dependency "debug"
+  s.add_development_dependency "money"
+  s.add_development_dependency "rspec"
+  s.add_development_dependency "simplecov"
+  s.add_development_dependency "tapioca"
 end

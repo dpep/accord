@@ -1,0 +1,25 @@
+name: Ruby
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: clone ${{ github.repository }}
+        uses: actions/checkout@v6
+      - name: setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+      - name: run tests
+        run: bundle exec rspec
+      - name: upload code coverage
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
