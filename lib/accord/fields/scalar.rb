@@ -49,7 +49,7 @@ module Accord
     def observe_permissive_coercion(raw, value, path)
       type.cast(raw, strict: true)
     rescue CoercionError
-      Accord.instrument(:coerced, field: name, path: path + [name], input: raw, value:, type: type.type_name)
+      Accord.notify_coerced(field: name, path: path + [name], input: raw, value:, type: type.type_name)
     end
   end
 end

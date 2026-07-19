@@ -48,17 +48,22 @@ module Accord
     # core gem carries no Rails/ActiveSupport dependency.
     attr_accessor :notifier
 
-    # Emit a permissive-parse event, e.g. "accord.parse.invalid_currency".
-    # Called whenever a schema tolerates and records an error rather than
-    # raising — so only ever in non-strict mode.
-    def instrument(code, **payload)
-      notifier&.instrument("accord.parse.#{code}", **payload)
+    # Emit a standard permissive-parse event — an error the schema tolerated
+    # (`accord.parse.<code>`) or a value it rounded. Gated by
+    # `config.notifications` (default on) and a no-op without a notifier.
+    def notify(code, **payload)
+      emit("accord.parse.#{code}", **payload) if config.notifications
     end
 
-    # Whether to emit `accord.parse.coerced` when a permissive parse accepts
-    # input that strict rules would reject — the signal for narrowing permissive
-    # scope toward strict. Opt-in (it costs a strict re-check per loose field)
-    # and only active when a notifier is listening.
+    # Emit `accord.parse.coerced` — a value that only parsed because permissive
+    # rules accepted input strict rules would reject. Gated by
+    # `config.observe_coercions` (default off).
+    def notify_coerced(**payload)
+      emit("accord.parse.coerced", **payload) if config.observe_coercions
+    end
+
+    # Whether to run the (opt-in, costs a strict re-check per loose field)
+    # coercion-observability path. Only active when a notifier is listening.
     def observe_coercions?
       config.observe_coercions && !notifier.nil?
     end
@@ -77,6 +82,12 @@ module Accord
     rescue LoadError
       raise Fault, "Accord's `money` and `iso_currency` types require the money gem. " \
                    "Add `gem \"money\"` to your Gemfile."
+    end
+
+    private
+
+    def emit(event, **payload)
+      notifier&.instrument(event, **payload)
     end
   end
 end

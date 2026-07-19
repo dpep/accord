@@ -268,8 +268,10 @@ Flip the default globally in an initializer (per-call `strict:` still wins):
 ```ruby
 # config/initializers/accord.rb
 Accord.configure do |c|
-  c.strict = false          # default parse mode
-  c.default_currency = "USD"  # makes money fields' currency optional
+  c.strict = false           # default parse mode
+  c.default_currency = "USD"   # makes money fields' currency optional
+  c.notifications = true       # emit accord.parse.<code> events (default on)
+  c.observe_coercions = false  # emit accord.parse.coerced (default off; see below)
 end
 ```
 

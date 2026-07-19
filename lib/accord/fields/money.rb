@@ -125,7 +125,7 @@ module Accord
       raise MissingField, @currency.name if strict
 
       currency_path = path + [@currency.name]
-      Accord.instrument(:required, field: @currency.name, path: currency_path)
+      Accord.notify(:required, field: @currency.name, path: currency_path)
       Result.failed(Error.new(path: currency_path, field: @currency.name, code: :required))
     end
 

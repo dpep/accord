@@ -153,7 +153,7 @@ module Accord
     def validation_error(path, validator, value, violation)
       code = violation[:code]
       full_path = path + [name]
-      Accord.instrument(code, path: full_path, field: name, validator: validator.name, value:)
+      Accord.notify(code, path: full_path, field: name, validator: validator.name, value:)
       Error.new(path: full_path, field: name, code:, validator: validator.name, value:, **violation[:metadata])
     end
 
@@ -165,7 +165,7 @@ module Accord
     # Create a structured error and emit its permissive-parse event. Only ever
     # reached in non-strict mode (strict paths raise before collecting).
     def build_error(path:, code:, input: nil)
-      Accord.instrument(code, field: name, path:, input:)
+      Accord.notify(code, field: name, path:, input:)
       Error.new(field: name, path:, code:, input:)
     end
 
