@@ -38,4 +38,15 @@ RSpec.describe Tapioca::Dsl::Compilers::AccordSchema do
     expect(rbi).to include("def salary; end")
     expect(rbi).to include("sig { returns(T.nilable(Address)) }")
   end
+
+  it "types the parse entry points as the schema class" do
+    stub_const("CreateEmployee", Class.new(Accord::Schema) { string :name, required: true })
+
+    rbi = rbi_for(CreateEmployee)
+
+    expect(rbi).to include("class << self")
+    expect(rbi).to include("def parse(input, strict:")
+    expect(rbi).to include("def parse!(input, strict:")
+    expect(rbi).to include("returns(T.attached_class)")
+  end
 end

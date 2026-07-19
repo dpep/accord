@@ -31,7 +31,7 @@ end
 `parse` is **permissive**: it coerces loose input, applies defaults, and collects a structured error per problem — it never raises. The result is an instance of your schema.
 
 ```ruby
-input = CreateEmployee.parse(name: "Ada", salary: "$65,000.00", hired_on: "2026-01-15")
+input = CreateEmployee.parse({ name: "Ada", salary: "$65,000.00", hired_on: "2026-01-15" })
 
 input.valid?     # => true
 input.name       # => "Ada"                (String)
@@ -48,7 +48,7 @@ Accessors return coerced values directly — no `.value` wrappers, no strings to
 Invalid input still parses; the problems land in `errors` as structured `Accord::Error` objects. Every field is checked in one pass, so you get all the errors at once:
 
 ```ruby
-input = CreateEmployee.parse(salary: "-5")
+input = CreateEmployee.parse({ salary: "-5" })
 
 input.valid?                 # => false
 input.errors.map(&:to_h)
@@ -61,7 +61,7 @@ Errors are **data, not strings** — `path`, `code`, `validator`, `value`, and v
 Prefer an exception when input is bad? `parse!` raises `Accord::InvalidInput` (carrying the same errors) unless the result is valid:
 
 ```ruby
-CreateEmployee.parse!(salary: "-5")   # => raises Accord::InvalidInput
+CreateEmployee.parse!({ salary: "-5" })   # => raises Accord::InvalidInput
 ```
 
 ## What a schema also gives you

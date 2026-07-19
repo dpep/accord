@@ -67,6 +67,8 @@ employee.hired_on  # => #<Date ...>
 employee.to_h      # => { name: "Ada", email: "...", salary: ..., active: true, hired_on: ... }
 ```
 
+`to_h` is a deep Hash of **typed** values (nested schemas recurse to Hashes too) — hand it to `Model.new`/`create!`. To **serialize** (render JSON), use `dump`, which emits the canonical *external* form — strings like `"65000.00"` and `"2026-01-15"`: `render json: employee.dump`.
+
 If the request is invalid, calling `employee` raises `Accord::InvalidInput`, which a `rescue_from` (installed when the concern is included) turns into a `422` with the structured errors — your action body never runs. A request like `POST /employees` with `{ "salary": "-5", "email": "nope" }` yields:
 
 ```json
@@ -136,7 +138,7 @@ def import
 end
 ```
 
-Like an inline block, this mints a projectable constant — an `Accord::ListSchema` (`BatchInput`) that projects array-shaped: OpenAPI `{ type: array, items: $ref }`, RBS `Array[CreateEmployee]`, GraphQL `[CreateEmployeeInput!]!`. `Accord::ListSchema.new(CreateEmployee)` is usable outside Rails too.
+Like an inline block, this mints a constant — an `Accord::ListSchema` (`BatchInput`) whose projection methods are array-shaped: `.openapi` → `{ type: array, items: $ref }`, `.rbs` → `Array[CreateEmployee]`, `.graphql` → `[CreateEmployeeInput!]!`. Because it's a list wrapper (not a `Schema` subclass), it isn't a standalone named type — `tapioca dsl` and `accord:rbs` emit the *element* (`CreateEmployee`), and you reference the list type inline. `Accord::ListSchema.new(CreateEmployee)` is usable outside Rails too.
 
 Eager validation (fail before the action body) is just a `before_action`:
 

@@ -235,13 +235,17 @@ module Accord
       errors.empty?
     end
 
+    # The parsed values as a plain, deep Hash of typed Ruby values — nested
+    # schemas and arrays recurse to Hashes too (so `to_h[:address]` is a Hash,
+    # not an Accord::Schema). Use this to build a record (`Model.new(input.to_h)`);
+    # use #dump for the canonical *external* form (strings) when serializing.
     def to_h
-      @values.dup
+      @values.transform_values { |value| hashify(value) }
     end
 
     # The canonical external representation — the inverse of parse. Scalars dump
-    # to canonical strings, nested schemas recurse. `to_h` gives the internal
-    # (typed) values; `dump` gives the external (serializable) ones.
+    # to canonical strings, nested schemas recurse. `to_h` gives typed Ruby
+    # values; `dump` gives external (serializable) ones — render this as JSON.
     def dump
       self.class.fields.transform_values { |field| field.dump(@values[field.name]) }
     end
@@ -260,6 +264,17 @@ module Accord
       end
 
       self
+    end
+
+    private
+
+    # Recurse nested schemas / arrays of schemas into plain Hashes for #to_h.
+    def hashify(value)
+      case value
+      when Schema then value.to_h
+      when Array  then value.map { |element| hashify(element) }
+      else value
+      end
     end
   end
 

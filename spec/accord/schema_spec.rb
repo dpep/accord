@@ -187,6 +187,19 @@ RSpec.describe Accord::Schema do
     it "reads a single field via #[]" do
       expect(input[:name]).to eq("Ada")
     end
+
+    it "recurses nested schemas and arrays into plain hashes" do
+      stub_const("Addr", Class.new(described_class) { string :city, :required })
+      stub_const("Team", Class.new(described_class) do
+        object :lead_address, Addr
+        array :member_addresses, Addr
+      end)
+
+      result = Team.parse({ lead_address: { city: "Paris" }, member_addresses: [{ city: "Rome" }] }).to_h
+
+      expect(result[:lead_address]).to eq(city: "Paris")
+      expect(result[:member_addresses]).to eq([{ city: "Rome" }])
+    end
   end
 
   describe ".descendants" do

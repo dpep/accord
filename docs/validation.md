@@ -53,7 +53,7 @@ Each violation becomes a structured `Accord::Error`:
 
 ```ruby
 schema = Class.new(Accord::Schema) { integer(:discount) { min 0 } }
-schema.parse(discount: "-5").errors.first.to_h
+schema.parse({ discount: "-5" }).errors.first.to_h
 # => { path: [:discount], field: :discount, code: :too_small, validator: :min, value: -5, expected: 0 }
 ```
 
@@ -70,7 +70,7 @@ Every validator on a field runs, so a value can produce several errors at once:
 
 ```ruby
 schema = Class.new(Accord::Schema) { integer(:n) { min 18; non_zero } }
-schema.parse(n: "0").errors.map(&:code)   # => [:too_small, :zero]
+schema.parse({ n: "0" }).errors.map(&:code)   # => [:too_small, :zero]
 ```
 
 ## Custom validators
@@ -144,7 +144,7 @@ class CreateEmployee < Accord::Schema
   object :address, Address
 end
 
-CreateEmployee.parse(address: { zip: "abc" }).errors.first.path   # => [:address, :zip]
+CreateEmployee.parse({ address: { zip: "abc" } }).errors.first.path   # => [:address, :zip]
 ```
 
 ## Introspection
@@ -164,12 +164,12 @@ Schemas are plain Ruby, so test them directly — faster and clearer than going 
 ```ruby
 RSpec.describe CreateEmployee do
   it "requires a positive salary" do
-    input = described_class.parse(name: "Ada", salary: "-5")
+    input = described_class.parse({ name: "Ada", salary: "-5" })
     expect(input.errors.map(&:code)).to include(:not_positive)
   end
 
   it "coerces and accepts valid input" do
-    input = described_class.parse(name: "Ada", salary: "$50,000")
+    input = described_class.parse({ name: "Ada", salary: "$50,000" })
     expect(input).to be_valid
     expect(input.salary).to eq(BigDecimal("50000"))
   end

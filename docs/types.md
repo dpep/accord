@@ -88,7 +88,7 @@ class Payroll < Accord::Schema
   money :fee,     default_currency: "USD"  # currency optional, defaults to USD, input overrides
 end
 
-Payroll.parse(salary: { amount: "1234.50", currency: "usd" }).salary
+Payroll.parse({ salary: { amount: "1234.50", currency: "usd" } }).salary
 # => #<Money fractional:123450 currency:USD>
 ```
 

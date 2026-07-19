@@ -25,6 +25,21 @@ module Tapioca
             constant.fields.each_value do |field|
               klass.create_method(field.name.to_s, return_type: field.sorbet_return)
             end
+
+            # Type the parse entry points so `CreateEmployee.parse!(params)` is a
+            # CreateEmployee (not T.untyped) with no T.let at the call site.
+            %w[parse parse!].each do |entry|
+              klass.create_method(
+                entry,
+                parameters: [
+                  create_param("input", type: "T.untyped"),
+                  create_kw_opt_param("strict", type: "T::Boolean", default: "Accord.config.strict"),
+                  create_kw_opt_param("path", type: "T::Array[T.untyped]", default: "[]"),
+                ],
+                return_type: "T.attached_class",
+                class_method: true,
+              )
+            end
           end
         end
 
