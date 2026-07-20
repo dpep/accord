@@ -75,6 +75,47 @@ class EmployeesController < ApplicationController
   end
 end
 
+# --- The contract DSL: accepts / returns -------------------------------------
+#
+# `accord` (above) gives named readers; `accepts`/`returns` declare a per-action
+# contract — request AND response — right on the action, and become the source
+# for OpenAPI *path* generation. Reach for it when you want the documented
+# contract; `accord` when you just want typed input.
+
+class EmployeeView < Accord::Schema   # a response contract is just a Schema, used via dump
+  uuid     :id
+  string   :name
+  currency :salary
+  boolean  :active
+end
+
+class EmployeesApiController < ApplicationController
+  accepts CreateEmployee, as: :employee   # typed reader `employee` (as: -> Sorbet-typed)
+  returns 201 => EmployeeView, 422 => :errors
+  def create
+    render json: EmployeeView.dump!(Employee.create!(employee.to_h)), status: :created
+  end
+
+  accepts do                              # anonymous input schema, named from the action
+    string  :name
+    boolean :active
+  end
+  returns 200 => [EmployeeView]           # a list response
+  def index
+    render json: input.to_h   # `input` is the default reader (rename via Accord.config.input_reader)
+  end
+end
+
+# Generate the OpenAPI document from every declared contract (e.g. a rake task):
+#
+#   Rails.application.eager_load!
+#   doc = Accord::ControllerHelpers.openapi_document(info: { title: "API", version: "v1" })
+#   File.write("openapi.json", JSON.pretty_generate(doc))
+#
+# `doc` has full `paths` (verb + path from your routes), `components.schemas`
+# (CreateEmployee, EmployeeView, ...), and a shared `components.responses`
+# AccordErrors for every `422 => :errors`.
+
 # --- Notes -------------------------------------------------------------------
 #
 # * No strong-params `permit`: the schema is the allowlist — undeclared params
