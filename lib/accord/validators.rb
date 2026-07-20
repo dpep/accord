@@ -290,6 +290,13 @@ module Accord
         BUILTINS.each { |name, klass| register(name, klass) }
         self
       end
+
+      # Lock the registry so a stray runtime registration raises instead of
+      # racing — call after boot once your validators are registered.
+      def freeze!
+        @factories.freeze
+        self
+      end
     end
 
     BUILTINS = {
@@ -309,6 +316,11 @@ module Accord
       def names = registry.names
       def clear = registry.clear
       def reset = registry.reset
+      def freeze! = registry.freeze!
     end
+
+    # Build the registry eagerly at load, not lazily on first use — so init
+    # happens once, single-threaded, during require (no `@registry ||=` race).
+    registry
   end
 end

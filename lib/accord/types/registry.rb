@@ -38,12 +38,21 @@ module Accord
         @types.clear
         self
       end
+
+      # Lock the registry so a stray runtime registration raises instead of
+      # racing — call after boot once your types are registered.
+      def freeze!
+        @types.freeze
+        self
+      end
     end
 
     class << self
       def registry
         @registry ||= Registry.new
       end
+
+      def freeze! = registry.freeze!
 
       # Register a type and expose its DSL method on Accord::Schema. Registering
       # an existing name overrides it — schemas defined afterward use the new

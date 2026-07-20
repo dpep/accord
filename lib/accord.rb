@@ -30,6 +30,17 @@ module Accord
       yield config
     end
 
+    # Lock the global registries and config after boot — a defensive freeze so a
+    # stray runtime `register`/config mutation raises (FrozenError) instead of
+    # racing. Everything is meant to be configured at boot; this makes it
+    # enforceable. Call from an initializer once your setup is done.
+    def freeze!
+      Types.freeze!
+      Validators.freeze!
+      config.freeze
+      self
+    end
+
     # Optional logger used by permissive standalone type coercion to record
     # dropped values.
     attr_accessor :logger
@@ -88,4 +99,8 @@ module Accord
       notifier&.instrument(event, **payload)
     end
   end
+
+  # Initialize config eagerly at load — once, single-threaded — rather than
+  # lazily on first use.
+  config
 end
