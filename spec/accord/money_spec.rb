@@ -150,10 +150,27 @@ describe "money type" do
       end
     end
 
-    it "takes the currency from configuration, not input" do
-      input = schema.parse({ salary: { amount: "1234.50" } })
+    it "takes the fixed currency when input omits one" do
+      expect(schema.parse({ salary: { amount: "1234.50" } }).salary).to eq(usd)
+    end
 
-      expect(input.salary).to eq(usd)
+    it "accepts input that matches the fixed currency (any case)" do
+      expect(schema.parse({ salary: { amount: "1234.50", currency: "usd" } }).salary).to eq(usd)
+    end
+
+    it "rejects input whose currency conflicts with the fixed one" do
+      input = schema.parse({ salary: { amount: "1234.50", currency: "EUR" } })
+
+      expect(input).not_to be_valid
+      error = input.errors.first
+      expect(error.code).to eq(:currency_mismatch)
+      expect(error.path).to eq([:salary, :currency])
+      expect(error.metadata).to include(expected: "USD")
+    end
+
+    it "raises on a conflicting currency in strict mode" do
+      expect { schema.parse({ salary: { amount: "1234.50", currency: "EUR" } }, strict: true) }
+        .to raise_error(Accord::CoercionError)
     end
 
     it "rejects an unknown fixed currency at declaration" do

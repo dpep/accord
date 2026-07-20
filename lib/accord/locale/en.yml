@@ -28,3 +28,4 @@ en:
       invalid_scale: "has too many decimal places"
       invalid_object: "must be an object"
       invalid_array: "must be a list"
+      currency_mismatch: "does not match the required currency"

@@ -14,14 +14,15 @@ module Accord
   #
   #   money :salary                                  # nested { amount:, currency: }
   #   money :salary, format: :flat                   # salary: "..", salary_currency: ".."
-  #   money :salary, currency: "USD"                 # fixed currency, amount only (input ignored)
+  #   money :salary, currency: "USD"                 # fixed currency; amount only (a conflicting currency errors)
   #   money :salary, default_currency: "USD"         # currency optional, defaults to USD, input overrides
   #   money :salary, format: :flat, currency_field: :ccy   # aliased currency key
   #
   # A default currency (per-field `default_currency:` or the global
   # `Accord.config.default_currency`) makes the currency optional and
   # polymorphic: a bare amount is that currency, and an explicit currency
-  # overrides. `currency:` (fixed) instead locks the currency and ignores input.
+  # overrides. `currency:` (fixed) instead locks the currency; input may omit it
+  # or match it, but a conflicting currency is rejected (`:currency_mismatch`).
   #
   # Dump always emits the canonical nested { amount:, currency: } form,
   # regardless of the input format.
@@ -131,7 +132,7 @@ module Accord
     end
 
     def resolve_currency(input, strict:, path:)
-      return Result.ok(@fixed_currency) if @fixed_currency
+      return resolve_fixed_currency(input, strict:, path:) if @fixed_currency
 
       result = @currency.resolve(input, strict:, path:)
       # Present (valid or invalid) input wins — an explicit currency overrides.
@@ -145,6 +146,22 @@ module Accord
       currency_path = path + [@currency.name]
       Accord.notify(:required, field: @currency.name, path: currency_path)
       Result.failed(Error.new(path: currency_path, field: @currency.name, code: :required))
+    end
+
+    # A fixed currency locks the value, but an input that supplies a *different*
+    # currency is a contract violation, not something to silently drop. Absent or
+    # matching input is fine; a conflicting one errors.
+    def resolve_fixed_currency(input, strict:, path:)
+      present, raw = @currency.read(input)
+      return Result.ok(@fixed_currency) unless present && !raw.nil?
+      return Result.ok(@fixed_currency) if @currency_type.parse(raw) == @fixed_currency
+
+      raise CoercionError.new(code: :currency_mismatch, input: raw) if strict
+
+      currency_path = path + [@currency.name]
+      Accord.notify(:currency_mismatch, field: @currency.name, path: currency_path, input: raw)
+      Result.failed(Error.new(path: currency_path, field: @currency.name, code: :currency_mismatch,
+                              input: raw, expected: @fixed_currency))
     end
 
     # The currency actually applied when input omits one: the field default, else
