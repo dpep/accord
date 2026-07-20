@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "accord/controller_helpers"
 require "tapioca"
 require "tapioca/dsl"
 require "tapioca/dsl/compilers/accord_controller"
@@ -48,5 +49,27 @@ describe Tapioca::Dsl::Compilers::AccordController do
     stub_const("SearchController", controller)
 
     expect(rbi_for(SearchController)).to include("sig { returns(SearchController::SearchInput) }")
+  end
+
+  it "types an as:-named accepts reader, but not the polymorphic input reader" do
+    stub_const("CreateEmployee", Class.new(Accord::Schema) { string :name, required: true })
+    stub_const("UpdateEmployee", Class.new(Accord::Schema) { string :email })
+    controller = controller_with do
+      accepts CreateEmployee, as: :employee
+      def create = employee
+
+      accepts UpdateEmployee          # default `input`, used again below -> polymorphic
+      def update = input
+
+      accepts CreateEmployee
+      def replace = input
+    end
+    stub_const("EmployeesController", controller)
+
+    rbi = rbi_for(EmployeesController)
+
+    expect(rbi).to include("sig { returns(CreateEmployee) }")
+    expect(rbi).to include("def employee; end")
+    expect(rbi).not_to include("def input; end")   # two schemas share `input` -> untypeable
   end
 end

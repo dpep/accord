@@ -11,20 +11,21 @@ require "accord"
 module Tapioca
   module Dsl
     module Compilers
-      # Generates RBI for the readers the `accord` controller macro defines, so
-      # `employee.salary` type-checks inside an action. Reads the introspectable
-      # `Controller.accord_inputs` registry — a schema reader returns that schema
-      # instance, a `[Schema]` list reader returns `T::Array[Element]`.
+      # Generates RBI for the readers Accord defines on a controller, so
+      # `employee.salary` type-checks inside an action. Covers both the `accord`
+      # macro's named readers (`accord_inputs`) and the `accepts`/`returns` DSL's
+      # readers (`accord_endpoints`) — the latter only when a reader name maps to
+      # a single schema (a unique `as:`); the shared, polymorphic `input` reader
+      # can't be typed and is skipped.
       class AccordController < Compiler
         # @override
         #: -> void
         def decorate
-          return if constant.accord_inputs.empty?
+          readers = accord_readers
+          return if readers.empty?
 
           root.create_path(constant) do |klass|
-            constant.accord_inputs.each do |name, input|
-              klass.create_method(name.to_s, return_type: reader_return_type(input))
-            end
+            readers.each { |name, input| klass.create_method(name.to_s, return_type: reader_return_type(input)) }
           end
         end
 
@@ -32,11 +33,27 @@ module Tapioca
           # @override
           #: -> T::Enumerable[Module]
           def gather_constants
-            all_classes.select { |klass| klass.respond_to?(:accord_inputs) && klass.accord_inputs.any? }
+            all_classes.select do |klass|
+              (klass.respond_to?(:accord_inputs) && klass.accord_inputs.any?) ||
+                (klass.respond_to?(:accord_endpoints) && klass.accord_endpoints.any?)
+            end
           end
         end
 
         private
+
+        # { reader_name => schema } for every typeable reader.
+        def accord_readers
+          readers = constant.respond_to?(:accord_inputs) ? constant.accord_inputs.dup : {}
+
+          endpoints = constant.respond_to?(:accord_endpoints) ? constant.accord_endpoints.values : []
+          endpoints.select(&:accepts?).group_by(&:reader).each do |reader, group|
+            schemas = group.map(&:accepts).uniq
+            readers[reader] = schemas.first if schemas.size == 1   # skip polymorphic readers
+          end
+
+          readers
+        end
 
         def reader_return_type(input)
           if input.is_a?(::Accord::Schema::List)
