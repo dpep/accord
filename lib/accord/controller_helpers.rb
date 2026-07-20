@@ -3,6 +3,7 @@
 require_relative "errors"
 require_relative "schema"
 require_relative "schema/list"
+require_relative "endpoint"
 
 module Accord
   # Rails controller integration. The schema is the entry point — call
@@ -116,6 +117,55 @@ module Accord
         @accord_inputs ||= superclass.respond_to?(:accord_inputs) ? superclass.accord_inputs.dup : {}
       end
 
+      # --- accepts / returns: the per-action contract DSL --------------------
+      # Sig-style decorators that bind to the *next* `def`. `accepts` declares the
+      # request schema (a class, a `[Schema]` list, or a block) and defines the
+      # input reader; `returns` declares `status => contract`. Both compose, both
+      # optional. See Accord::Endpoint / #accord_endpoints for the result.
+      #
+      #   accepts CreateEmployee, as: :employee
+      #   returns 201 => EmployeeView, 422 => :errors
+      #   def create; ...; end
+
+      # The request contract for the next action. `as:` names the reader (default
+      # Accord.config.input_reader, e.g. `input`); `from:`/`strict:` mirror the
+      # `accord` macro. A block declares an anonymous schema.
+      def accepts(schema = nil, from: nil, as: nil, strict: nil, &block)
+        raise ArgumentError, "accepts takes a schema or a block, not both" if block && schema
+        raise ArgumentError, "accepts needs a schema or a block" if schema.nil? && block.nil?
+
+        accord_pending[:accepts] = { schema:, block:, from:, as:, strict: }
+        nil
+      end
+
+      # The response contract(s) for the next action — `returns(200 => View, 422
+      # => :errors)`, or `returns(201) { ... }` for an anonymous response schema.
+      def returns(responses = nil, &block)
+        if block
+          accord_pending_returns[Integer(responses)] = { block: }
+        else
+          responses.each { |status, contract| accord_pending_returns[Integer(status)] = { contract: } }
+        end
+        nil
+      end
+
+      # This controller's declared operations, `{ action => Accord::Endpoint }` —
+      # introspectable, inherited by subclasses.
+      def accord_endpoints
+        @accord_endpoints ||= superclass.respond_to?(:accord_endpoints) ? superclass.accord_endpoints.dup : {}
+      end
+
+      # @api private — Ruby's hook, fired after every `def`. When an accepts/
+      # returns is pending, bind it to this action and clear the slot.
+      def method_added(action)
+        super
+        pending = @accord_pending
+        return if pending.nil? || pending.empty?
+
+        @accord_pending = nil
+        build_accord_endpoint(action, pending)
+      end
+
       private
 
       # Name a generated schema (inline block or list) as a controller constant
@@ -137,9 +187,82 @@ module Accord
 
         const_set(const, yield)
       end
+
+      def accord_pending
+        @accord_pending ||= {}
+      end
+
+      def accord_pending_returns
+        accord_pending[:returns] ||= {}
+      end
+
+      # Assemble the Endpoint for an action from its pending accepts/returns and
+      # define the input reader.
+      def build_accord_endpoint(action, pending)
+        accepts = pending[:accepts]
+        schema = accepts && resolve_accepts_schema(action, accepts)
+        reader = (accepts && accepts[:as]) || Accord.config.input_reader
+
+        accord_endpoints[action] = Endpoint.new(
+          controller: name, action:, accepts: schema, returns: resolve_returns(action, pending[:returns] || {}),
+          from: accepts && accepts[:from], strict: accepts && accepts[:strict], reader:,
+        )
+
+        # One action-dispatched reader (resolves the current action's contract),
+        # so several actions sharing the default name don't clobber each other.
+        define_method(reader) { accord_action_input } if accepts && !method_defined?(reader)
+      end
+
+      # A schema class, a Schema::List for `[Schema]`, or a block named after the
+      # action (`create` -> `CreateInput`) so it projects.
+      def resolve_accepts_schema(action, accepts)
+        if accepts[:block]
+          register_accord_schema(action, "#{accord_camelize(action)}Input") { Class.new(Schema, &accepts[:block]) }
+        elsif accepts[:schema].is_a?(Array)
+          raise ArgumentError, "accepts [Schema] takes exactly one schema" if accepts[:schema].size != 1
+
+          Schema::List.new(accepts[:schema].first)
+        else
+          accepts[:schema]
+        end
+      end
+
+      def resolve_returns(action, pending)
+        pending.transform_values do |spec|
+          if spec[:block]
+            register_accord_schema(action, "#{accord_camelize(action)}Response") { Class.new(Schema, &spec[:block]) }
+          else
+            spec[:contract]
+          end
+        end
+      end
+
+      def accord_camelize(name)
+        name.to_s.split(/[^a-zA-Z0-9]+/).map(&:capitalize).join
+      end
+    end
+
+    # Enumerate every controller's declared operations across the app (eager-load
+    # first). The registry an OpenAPI-paths generator / contract tooling reads.
+    def self.endpoints(controllers = discover_controllers)
+      controllers
+        .select { |c| c.respond_to?(:accord_endpoints) && c.name }
+        .flat_map { |c| c.accord_endpoints.values.map { |endpoint| endpoint.with(controller: c.name) } }
     end
 
     private
+
+    # The parsed input for the current action, from its `accepts` contract —
+    # memoized, raises InvalidInput (rendered 422) on invalid input.
+    def accord_action_input
+      endpoint = self.class.accord_endpoints[action_name.to_sym]
+      raise ArgumentError, "no accord `accepts` contract for #{action_name}" unless endpoint&.accepts?
+
+      @accord_input_cache ||= {}
+      @accord_input_cache[action_name] ||= endpoint.accepts.parse!(
+        accord_source(endpoint.from), **(endpoint.strict.nil? ? {} : { strict: endpoint.strict }),
+      )
+    end
 
     # Override in a controller to customize the 422 response.
     def render_accord_errors(error)

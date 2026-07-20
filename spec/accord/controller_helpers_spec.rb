@@ -27,6 +27,7 @@ describe Accord::ControllerHelpers do
       include Accord::ControllerHelpers
 
       attr_reader :rendered
+      attr_accessor :action_name
 
       def initialize(params = {})
         @params = params
@@ -40,10 +41,12 @@ describe Accord::ControllerHelpers do
         @rendered = args
       end
 
-      # Mimic Rails dispatch: run the action, routing raised exceptions through
-      # the registered rescue_from handlers.
-      def dispatch(&action)
-        instance_exec(&action)
+      # Mimic Rails dispatch: set the current action (for accepts/returns
+      # readers), run it, routing raised exceptions through the rescue_from
+      # handlers.
+      def dispatch(action = nil, &block)
+        @action_name = action.to_s if action
+        instance_exec(&block)
       rescue StandardError => e
         handler = self.class.rescue_handlers.find { |klass, _| e.is_a?(klass) }&.last
         raise unless handler
