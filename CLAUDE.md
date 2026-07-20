@@ -12,9 +12,9 @@ Executable API contracts for Ruby. A schema is the source of truth for an API bo
 
 **Errors are structured data, not strings.** Every `Accord::Error` carries `path`, `code`, `validator`, `value`, and validator-specific metadata (`expected`, `min`, `max`, …) — no message. Rendering (Rails JSON, GraphQL, i18n, logs) is a separate concern the validator layer knows nothing about. Nested schemas naturally produce nested paths (`[:employees, 3, :salary]`) with no special handling.
 
-**Distinguish client faults (4xx) from programmer/server faults (5xx).** Bad *data* — a client sending the wrong value, a missing required field, a non-object where a nested object is expected — is a client fault: collect it as a structured `Accord::Error` (a 4xx the caller renders), never raise. A misused *contract* — a schema declaring `positive` on a boolean, a default of the wrong type, a caller handing `parse` a non-hash root, a buggy custom validator that raises — is a programmer fault: **fail fast** with a plain Ruby exception (`ArgumentError`, etc.), at declaration/boot when possible, otherwise let it propagate as a 5xx. Don't dress a programmer bug up as a collectable 422, and don't swallow it. These are not i18n candidates.
+**Distinguish client faults (4xx) from programmer faults (5xx).** Bad *data* — a wrong value, a missing required field, a non-object where a nested object is expected — is a client fault: collect it as a structured `Accord::Error` the caller renders, never raise. A misused *contract* — `positive` on a boolean, a default of the wrong type, `parse` handed a non-hash root, a custom validator that raises — is a programmer fault: **fail fast** with a plain Ruby exception (`ArgumentError`, etc.), at declaration/boot when possible. Don't dress a programmer bug up as a collectable 422, and don't swallow it — it's a 5xx, not an i18n candidate.
 
-**Assume bad and hostile input is the norm.** Untrusted input is the whole point — expect malformed, wrong-typed, oversized, and adversarial data on every field, and be resilient to it: permissive parse never crashes, every edge routes through `invalid!`/a structured error, and non-finite/degenerate values are guarded. Error reporting must be *helpful* — precise `path`, specific `code`, the offending `value`/`input` — so a caller can act on it. Every accepted input, rejected input, edge case, and failure mode carries test coverage; a fix without a regression test isn't done.
+**Assume hostile input is the norm.** Untrusted input is the whole point — expect malformed, wrong-typed, oversized, and adversarial data on every field. Resilience is the default posture: no input, however degenerate, escapes as an unstructured crash.
 
 ## Type system
 
@@ -49,7 +49,7 @@ Built-in validators live in `Accord::Validators`; each reports `code` + metadata
 - Strict mode raises on the first coercion failure (trusted callers); non-strict collects structured `Accord::Error`s and emits `accord.parse.<code>` via `Accord.notifier`. Strict affects coercion only — validations always collect.
 - Rounding is never silent — `decimal`/`currency`/`duration` reject excess precision unless `round: true`.
 - Keep the core gem free of Rails/ActiveSupport; Rails integration is opt-in (`require "accord/rails"`). The `money` gem is an optional dependency — `money` and `iso_currency` lazy-require it (`Accord.require_money!`) with a clear error if absent.
-- Tests: quality over quantity — accepted inputs, rejected inputs, strict vs. permissive, `dump`, and OpenAPI per type.
+- Tests: quality over quantity — cover accepted inputs, rejected inputs, strict vs. permissive, `dump`, and OpenAPI per type. A fix without a regression test isn't done.
 - Configure at boot. `Accord.config`, the validator registry, and schema definitions are global mutable state initialized lazily (`@x ||=`) — set them in initializers, not concurrently at runtime.
 - Permissive parse never raises — it collects. A type's permissive `coerce` must route bad input through `invalid!` (never let an exception escape); guard edge cases like non-finite Floats.
 
