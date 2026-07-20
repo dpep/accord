@@ -218,6 +218,36 @@ describe Accord::Schema do
     end
   end
 
+  describe "presence and PATCH semantics" do
+    let(:schema) do
+      Class.new(described_class) do
+        string :name
+        string :email
+        string :role, default: "member"
+      end
+    end
+
+    it "tracks which fields the input carried a key for" do
+      input = schema.parse({ name: "Ada", email: nil })
+
+      expect(input.present?(:name)).to be(true)
+      expect(input.present?(:email)).to be(true)   # explicit null is still present
+      expect(input.present?(:role)).to be(false)   # absent
+    end
+
+    it "clears on an explicit null (ignoring the default); takes the default when absent" do
+      expect(schema.parse({ role: nil }).role).to be_nil
+      expect(schema.parse({}).role).to eq("member")
+    end
+
+    it "to_h(compact:) keeps explicit nulls and drops absent fields" do
+      input = schema.parse({ name: "Ada", email: nil })
+
+      expect(input.to_h(compact: true)).to eq(name: "Ada", email: nil)
+      expect(input.to_h).to include(role: "member")   # full form still applies defaults
+    end
+  end
+
   describe "defaults" do
     it "coerces a non-canonical default to the field's type" do
       klass = Class.new(described_class) do

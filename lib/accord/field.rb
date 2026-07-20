@@ -175,9 +175,18 @@ module Accord
     # MoneyField#resolve.
     def resolve_absent(present, raw, strict:, path:)
       return if present && !raw.nil?
+
+      # Absent or explicit null. Required still requires a value either way.
+      if required?
+        raise MissingField, name if strict
+
+        return Result.failed(error(path, :required))
+      end
+
+      # An explicit null clears the field (PATCH semantics), ignoring the
+      # default; a truly absent field takes the default.
+      return Result.ok(nil) if present
       return Result.ok(resolve_default) if has_default?
-      raise MissingField, name if required? && strict
-      return Result.failed(error(path, :required)) if required?
 
       Result.ok(nil)
     end

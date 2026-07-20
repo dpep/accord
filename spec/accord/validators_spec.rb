@@ -130,8 +130,23 @@ describe "validation framework" do
       expect { schema { string(:name) { length 1..50 } } }.not_to raise_error
     end
 
-    it "leaves custom validators unrestricted" do
+    it "leaves inline/block custom validators unrestricted" do
       expect { schema { string(:x) { validate { |_v| } } } }.not_to raise_error
+    end
+
+    it "honors `requires` on a custom validator class (multiple methods allowed)" do
+      stub_const("EvenValidator", Class.new(Accord::Validators::Base) do
+        requires :even?
+        def validate(value, collector)
+          collector.add(:odd) unless value.even?
+        end
+      end)
+      Accord::Validators.register(:even, EvenValidator)
+
+      expect { schema { integer(:n) { even } } }.not_to raise_error
+      expect { schema { string(:s) { even } } }.to raise_error(ArgumentError)
+    ensure
+      Accord::Validators.reset
     end
 
     it "keeps a single Required when required is declared twice" do

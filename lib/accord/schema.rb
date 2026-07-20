@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "set"
 require_relative "errors"
 require_relative "field"
 require_relative "fields/scalar"
@@ -257,6 +258,7 @@ module Accord
     def initialize
       @values = {}
       @errors = []
+      @present = Set.new
     end
 
     attr_reader :errors
@@ -265,12 +267,23 @@ module Accord
       errors.empty?
     end
 
+    # Whether a field's key was present in the input (even if its value was
+    # explicitly null) — the absent/explicit-null distinction PATCH needs.
+    def present?(name)
+      @present.include?(name)
+    end
+
     # The parsed values as a plain, deep Hash of typed Ruby values — nested
     # schemas and arrays recurse to Hashes too (so `to_h[:address]` is a Hash,
-    # not an Accord::Schema). Use this to build a record (`Model.new(input.to_h)`);
+    # not an Accord::Schema). Use it to build a record (`Model.new(input.to_h)`);
     # use #dump for the canonical *external* form (strings) when serializing.
-    def to_h
-      @values.transform_values { |value| hashify(value) }
+    #
+    # `compact: true` drops absent fields but keeps explicit nulls — the PATCH
+    # shape: `record.update(input.to_h(compact: true))` leaves untouched fields
+    # alone and clears the ones sent as null.
+    def to_h(compact: false)
+      pairs = compact ? @values.select { |name, _| @present.include?(name) } : @values
+      pairs.transform_values { |value| hashify(value, compact:) }
     end
 
     # The canonical external representation — the inverse of parse. Scalars dump
@@ -288,6 +301,8 @@ module Accord
     # errors. Public so Schema.parse can drive a freshly-allocated instance.
     def _parse(input, strict:, path:)
       self.class.fields.each_value do |field|
+        present, = field.read(input)
+        @present << field.name if present
         result = field.resolve(input, strict:, path:)
         @values[field.name] = result.value
         @errors.concat(result.errors)
@@ -299,10 +314,10 @@ module Accord
     private
 
     # Recurse nested schemas / arrays of schemas into plain Hashes for #to_h.
-    def hashify(value)
+    def hashify(value, compact:)
       case value
-      when Schema then value.to_h
-      when Array  then value.map { |element| hashify(element) }
+      when Schema then value.to_h(compact:)
+      when Array  then value.map { |element| hashify(element, compact:) }
       else value
       end
     end
