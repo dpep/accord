@@ -3,42 +3,57 @@
 require_relative "../field"
 
 module Accord
-  # A field holding a list of nested schemas. Each element is parsed through the
-  # element schema; errors carry the element's index in their path, e.g.
-  # [:employees, 2, :salary].
+  # A field holding a list. Its element is either a nested Schema (a list of
+  # objects) or a scalar Type (a list of strings, uuids, ...). Each element is
+  # parsed at its index, so errors carry it: [:employees, 2, :salary] or
+  # [:tags, 1].
   #
-  #   array :employees, Employee
+  #   array :employees, Employee     # list of nested schemas
+  #   array :tags, :string           # list of scalars
   class ArrayField < Field
-    attr_reader :schema
+    attr_reader :element
 
-    def initialize(schema:, **opts)
+    def initialize(element:, **opts)
       super(**opts)
-      @schema = schema
+      @element = element
+    end
+
+    # True when the element is a nested schema (vs a scalar type).
+    def schema_element?
+      element.is_a?(::Class) && element < Schema
     end
 
     def openapi
-      { type: "array", items: openapi_ref(schema) }
+      { type: "array", items: schema_element? ? openapi_ref(element) : element.openapi }
     end
 
     def dump(value)
-      value&.map(&:dump)
+      return if value.nil?
+
+      schema_element? ? value.map(&:dump) : value.map { |item| element.dump(item) }
     end
 
+    # Only a schema element is an OpenAPI/GraphQL component; a scalar type is inline.
     def nested_schema
-      schema
+      element if schema_element?
     end
 
     def rbs
-      "Array[#{schema.name || "untyped"}]"
+      "Array[#{schema_element? ? (element.name || "untyped") : element.rbs}]"
     end
 
     def sorbet
-      "T::Array[#{schema.name || "T.untyped"}]"
+      "T::Array[#{schema_element? ? (element.name || "T.untyped") : element.sorbet}]"
     end
 
     def graphql_ref
-      element = schema.graphql_input_name || raise(ArgumentError, "cannot generate GraphQL for an anonymous nested schema")
-      "[#{element}!]"
+      inner =
+        if schema_element?
+          element.graphql_input_name || raise(ArgumentError, "cannot generate GraphQL for an anonymous nested schema")
+        else
+          element.graphql
+        end
+      "[#{inner}!]"
     end
 
     private
@@ -52,13 +67,24 @@ module Accord
 
       values = []
       errors = []
-      raw.each_with_index do |element, index|
-        value, element_errors = parse_object(schema, element, strict:, path: path + [name, index])
+      raw.each_with_index do |item, index|
+        value, item_errors = coerce_element(item, strict:, path: path + [name, index])
         values << value
-        errors.concat(element_errors)
+        errors.concat(item_errors)
       end
 
       Result.new(values, errors)
+    end
+
+    # Parse one element — through the sub-schema (objects) or the type (scalars).
+    def coerce_element(item, strict:, path:)
+      return parse_object(element, item, strict:, path:) if schema_element?
+
+      [element.cast(item, strict:), []]
+    rescue CoercionError => e
+      raise if strict
+
+      [nil, [build_error(path:, code: e.code, input: e.input)]]
     end
   end
 end

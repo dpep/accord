@@ -46,7 +46,7 @@ module Accord
         @element = element
         # A representative field: not parsed through (elements are parsed directly
         # for clean paths), only its array-shaped projections are reused.
-        @field = ArrayField.new(name: :items, schema: element, required: true)
+        @field = ArrayField.new(name: :items, element:, required: true)
       end
 
       # Parse a bare array; each element is parsed at its index so errors carry it

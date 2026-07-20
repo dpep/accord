@@ -121,4 +121,40 @@ describe "nested schemas" do
         .to raise_error(Accord::CoercionError)
     end
   end
+
+  describe "arrays of scalars" do
+    let(:schema) { Class.new(Accord::Schema) { array :tags, :string; array :ids, :uuid } }
+
+    it "parses and canonicalizes each element" do
+      input = schema.parse({ tags: %w[a b], ids: ["550E8400-E29B-41D4-A716-446655440000"] })
+
+      expect(input.tags).to eq(%w[a b])
+      expect(input.ids).to eq(["550e8400-e29b-41d4-a716-446655440000"])
+    end
+
+    it "carries the element index in error paths" do
+      input = schema.parse({ ids: ["nope"] })
+
+      expect(input).not_to be_valid
+      expect(input.errors.first.path).to eq([:ids, 0])
+      expect(input.errors.first.code).to eq(:invalid_uuid)
+    end
+
+    it "projects as an array of the scalar type" do
+      field = schema.fields[:tags]
+
+      expect(field.openapi).to eq(type: "array", items: { type: "string" })
+      expect(field.rbs).to eq("Array[String]")
+      expect(field.graphql_type).to eq("[String!]")
+    end
+
+    it "accepts a Type instance for element options" do
+      klass = Class.new(Accord::Schema) { array :prices, Accord::Types::Decimal.new(scale: 2) }
+      expect(klass.parse({ prices: ["1.50"] }).prices.first).to eq(BigDecimal("1.5"))
+    end
+
+    it "rejects an invalid element at declaration" do
+      expect { Class.new(Accord::Schema) { array :x, 42 } }.to raise_error(ArgumentError)
+    end
+  end
 end

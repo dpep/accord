@@ -82,10 +82,22 @@ module Accord
         register_field(ObjectField.new(name:, schema:, **opts), flags, &block)
       end
 
-      # A list of nested schemas. Each element is parsed through `schema`.
-      #   array :employees, Employee
-      def array(name, schema, *flags, **opts, &block)
-        register_field(ArrayField.new(name:, schema:, **opts), flags, &block)
+      # A list whose element is a nested schema or a scalar type. Each element is
+      # parsed at its index.
+      #   array :employees, Employee     # list of objects
+      #   array :tags, :string           # list of scalars
+      def array(name, element, *flags, **opts, &block)
+        register_field(ArrayField.new(name:, element: array_element(name, element), **opts), flags, &block)
+      end
+
+      # Resolve an array's declared element to a Schema class or a Type instance,
+      # failing fast on anything else.
+      def array_element(name, element)
+        return element if (element.is_a?(Class) && element < Schema) || element.is_a?(Type)
+        return Types.build(element) if element.is_a?(Symbol) && Types.registered?(element)
+
+        raise ArgumentError,
+              "array :#{name} element must be a schema, a Type, or a registered type name — got #{element.inspect}"
       end
 
       # An amount + currency parsed into a money-gem Money value.
