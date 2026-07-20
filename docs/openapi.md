@@ -2,7 +2,10 @@
 
 The schema that parses and validates your input also **describes** it. Accord projects a schema into an OpenAPI object schema — properties, `required`, and validator-derived constraints — so the contract can't drift from the code that enforces it.
 
-Accord generates the **data-contract schemas** (OpenAPI `components`). Paths/operations are your app's job (route it yourself, or let [rswag](#rswag) drive them from request specs).
+Two levels of generation:
+
+- **Schemas** (`components`) — every `Accord::Schema` projects itself (below). Pair with your own paths, or feed [rswag](#rswag).
+- **The whole document** (`paths` + `components`) — if you declare per-action contracts with the [`accepts`/`returns` DSL](rails.md#the-contract-dsl-accepts--returns), `Accord::ControllerHelpers.openapi_document` generates the complete spec (see [below](#the-whole-document-from-contracts)).
 
 ## `Schema.openapi`
 
@@ -53,9 +56,24 @@ Accord.openapi_schemas(CreateEmployee, UpdateEmployee, EmployeeFilters)
 
 Drop that under `components: { schemas: ... }` in your OpenAPI document and reference each with `$ref: "#/components/schemas/<Name>"`.
 
+## The whole document, from contracts
+
+If your controllers declare per-action contracts with [`accepts`/`returns`](rails.md#the-contract-dsl-accepts--returns), Accord generates the **entire** document — `paths` (verb and path from your routes, request body, responses), the `components.schemas` graph, and a shared `components.responses/AccordErrors` for every `422 => :errors`:
+
+```ruby
+# lib/tasks/openapi.rake
+require "json"
+
+Rails.application.eager_load!   # so every controller is loaded
+doc = Accord::ControllerHelpers.openapi_document(info: { title: "API", version: "v1" })
+File.write("openapi.json", JSON.pretty_generate(doc))
+```
+
+Verb and path come from `Rails.application.routes` (joined to each endpoint by `controller#action`); pass `resolver:` to override the routing source or scope generation. Nothing is stored, so the document can't drift — regenerate it in CI and diff. This is the "single source of truth" endgame: one declaration parses, validates, types, *and* documents each endpoint.
+
 ## rswag
 
-[rswag](https://github.com/rswag/rswag) generates Swagger/OpenAPI docs (and a UI) from request specs. Accord fills in the `components.schemas` half; rswag describes the paths. They connect through the shared components section.
+[rswag](https://github.com/rswag/rswag) generates Swagger/OpenAPI docs (and a UI) from request specs. Accord fills in the `components.schemas` half; rswag describes the paths. They connect through the shared components section. (If you use the [contract DSL](#the-whole-document-from-contracts), Accord already emits the paths — rswag then only *verifies* the generated doc against real requests, rather than authoring it.)
 
 **1. Register Accord's schemas as components** in `spec/swagger_helper.rb`:
 
