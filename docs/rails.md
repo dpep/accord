@@ -165,6 +165,37 @@ before_action :employee, only: :create
 
 ---
 
+## The contract DSL: `accepts` / `returns`
+
+Where `accord` gives you *named readers* decoupled from actions, the `accepts`/`returns` decorators declare a **per-action contract** — request schema, response schema(s), all in one place on the action, `sig`-style. They're the source for OpenAPI *path* generation; `accord` is the lighter tool when you just want typed input.
+
+```ruby
+class EmployeesController < ApplicationController
+  accepts CreateEmployee, as: :employee
+  returns 201 => EmployeeView, 422 => :errors
+  def create
+    render json: EmployeeView.dump!(Employee.create!(employee.to_h)), status: :created
+  end
+
+  accepts do                       # anonymous schema, named CreateController::IndexInput
+    string  :name
+    boolean :active
+  end
+  returns 200 => [EmployeeView]    # a list response
+  def index
+    render json: EmployeeView.dump_all(Employee.where(input.to_h))
+  end
+end
+```
+
+- Both decorators bind to the **next `def`** and compose; either or both is fine. `accepts` alone is a typed-input endpoint; `returns` alone is an output-only projection.
+- **The reader** is `input` by default (rename per-action with `as:`, or globally with `Accord.config.input_reader`). It's action-dispatched — it parses whatever the current action declared — so it's a single method, not one per action. Because of that, `input` is polymorphic and can't be statically typed; a **`as:`-named** reader (unique per action) can be, so prefer `as:` when you want the Sorbet/RBI reader type.
+- `accepts` carries the same `from:`/`strict:`/`[Schema]`/block options as `accord`; a block schema is named from the action (`create` → `CreateInput`) so it projects.
+- **`returns`** maps `status => contract`, where a contract is a `Schema`, a `[Schema]` list, or a symbol naming a shared response (`:errors`). Responses are ordinary `Accord::Schema`s used in the dump direction — no separate serializer concept.
+- Introspect the whole graph: `Controller.accord_endpoints` (`{ action => Accord::Endpoint }`), or `Accord::ControllerHelpers.endpoints` across the app.
+
+---
+
 ## Calling a schema directly
 
 The macro is sugar; the schema is the real entry point. `Schema.parse!(params)` returns the typed input or raises `Accord::InvalidInput`:
