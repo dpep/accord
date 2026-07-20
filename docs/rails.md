@@ -140,7 +140,7 @@ def import
 end
 ```
 
-Like an inline block, this mints a constant — an `Accord::ListSchema` (`BatchInput`) whose projection methods are array-shaped: `.openapi` → `{ type: array, items: $ref }`, `.rbs` → `Array[CreateEmployee]`, `.graphql` → `[CreateEmployeeInput!]!`. Because it's a list wrapper (not a `Schema` subclass), it isn't a standalone named type — `tapioca dsl` and `accord:rbs` emit the *element* (`CreateEmployee`), and you reference the list type inline. `Accord::ListSchema.new(CreateEmployee)` is usable outside Rails too.
+Like an inline block, this mints a constant — an `Accord::Schema::List` (`BatchInput`) whose projection methods are array-shaped: `.openapi` → `{ type: array, items: $ref }`, `.rbs` → `Array[CreateEmployee]`, `.graphql` → `[CreateEmployeeInput!]!`. Because it's a list wrapper (not a `Schema` subclass), it isn't a standalone named type — `tapioca dsl` and `accord:rbs` emit the *element* (`CreateEmployee`), and you reference the list type inline. `Accord::Schema::List.new(CreateEmployee)` is usable outside Rails too.
 
 Eager validation (fail before the action body) is just a `before_action`:
 

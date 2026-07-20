@@ -2,7 +2,7 @@
 
 require_relative "errors"
 require_relative "schema"
-require_relative "list_schema"
+require_relative "schema/list"
 
 module Accord
   # Rails controller integration. The schema is the entry point — call
@@ -60,7 +60,7 @@ module Accord
       # A one-element array denotes a **list** input — `accord :batch,
       # [CreateEmployee]` parses an array (the reader returns the parsed
       # elements, errors carrying each index: `[2, :salary]`) and mints a
-      # projectable ListSchema constant, just like an inline block.
+      # projectable Schema::List constant, just like an inline block.
       def accord(name, schema = nil, from: nil, const: nil, &block)
         input =
           if block
@@ -72,7 +72,7 @@ module Accord
           elsif schema.is_a?(Array)
             raise ArgumentError, "accord :#{name}: a list source takes exactly one schema, e.g. [CreateEmployee]" if schema.size != 1
 
-            register_accord_schema(name, const) { ListSchema.new(schema.first) }
+            register_accord_schema(name, const) { Schema::List.new(schema.first) }
           elsif const
             raise ArgumentError, "accord :#{name}: `const:` only applies to an inline (block) or list schema"
           else
@@ -84,7 +84,7 @@ module Accord
       end
 
       # The inputs declared on this controller, as `{ reader_name => schema }`
-      # (a schema class, or an Accord::ListSchema for a `[Schema]` list). Fully
+      # (a schema class, or an Accord::Schema::List for a `[Schema]` list). Fully
       # introspectable — and the source the Tapioca controller compiler types the
       # generated readers from. A subclass inherits its parents' declarations.
       def accord_inputs
@@ -103,7 +103,7 @@ module Accord
 
         if const_defined?(const, false)
           existing = const_get(const)
-          unless (existing.is_a?(Class) && existing < Schema) || existing.is_a?(ListSchema)
+          unless (existing.is_a?(Class) && existing < Schema) || existing.is_a?(Schema::List)
             raise ArgumentError,
                   "accord :#{name} would overwrite the existing constant #{const} — pass `const:` to choose another name"
           end

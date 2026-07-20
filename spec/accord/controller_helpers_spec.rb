@@ -167,13 +167,13 @@ RSpec.describe Accord::ControllerHelpers do
       expect { build_controller { accord :people, [input, input] } }.to raise_error(ArgumentError)
     end
 
-    it "mints a projectable ListSchema constant for a list input" do
+    it "mints a projectable Schema::List constant for a list input" do
       controller = build_controller
       stub_const("ImportsController", controller)
       element = stub_const("Person", Class.new(Accord::Schema) { string :name, :required })
       controller.class_eval { accord :people, [element] }
 
-      expect(ImportsController::PeopleInput).to be_a(Accord::ListSchema)
+      expect(ImportsController::PeopleInput).to be_a(Accord::Schema::List)
       expect(ImportsController::PeopleInput.openapi[:type]).to eq("array")
     end
 
@@ -185,7 +185,7 @@ RSpec.describe Accord::ControllerHelpers do
       end
 
       expect(controller.accord_inputs[:employee]).to eq(input)
-      expect(controller.accord_inputs[:people]).to be_a(Accord::ListSchema)
+      expect(controller.accord_inputs[:people]).to be_a(Accord::Schema::List)
     end
 
     it "inherits declarations into a subclass" do

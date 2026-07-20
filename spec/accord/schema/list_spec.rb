@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe Accord::ListSchema do
+RSpec.describe Accord::Schema::List do
   let(:element) do
     stub_const("Employee", Class.new(Accord::Schema) { string :name, :required })
     Employee

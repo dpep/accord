@@ -12,7 +12,7 @@ require_relative "accord/fields/object"
 require_relative "accord/fields/array"
 require_relative "accord/fields/money"
 require_relative "accord/schema"
-require_relative "accord/list_schema"
+require_relative "accord/schema/list"
 
 # Accord — executable API contracts for Ruby.
 #

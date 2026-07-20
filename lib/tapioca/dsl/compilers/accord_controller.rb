@@ -39,7 +39,7 @@ module Tapioca
         private
 
         def reader_return_type(input)
-          if input.is_a?(::Accord::ListSchema)
+          if input.is_a?(::Accord::Schema::List)
             "T::Array[#{input.element.name || "T.untyped"}]"
           else
             input.name || "T.untyped"
