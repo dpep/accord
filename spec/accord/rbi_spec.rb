@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe "RBI projection" do
+describe "RBI projection" do
   describe "sorbet type mapping" do
     it "maps each type to its Sorbet type" do
       expect(Accord::Types::String.new.sorbet).to eq("String")

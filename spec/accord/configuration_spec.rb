@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe "configuration" do
+describe "configuration" do
   let(:schema) do
     Class.new(Accord::Schema) do
       currency :salary

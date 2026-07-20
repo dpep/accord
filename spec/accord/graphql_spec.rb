@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe "GraphQL projection" do
+describe "GraphQL projection" do
   describe "scalar type mapping" do
     it "maps each type to its GraphQL scalar" do
       expect(Accord::Types::String.new.graphql).to eq("String")

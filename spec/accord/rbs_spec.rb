@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe "RBS projection" do
+describe "RBS projection" do
   describe "scalar type mapping" do
     it "maps each type to its RBS type" do
       expect(Accord::Types::String.new.rbs).to eq("String")

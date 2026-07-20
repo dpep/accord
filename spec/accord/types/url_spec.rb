@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe Accord::Types::URL do
+describe Accord::Types::URL do
   subject(:type) { described_class.new }
 
   describe "accepted inputs" do

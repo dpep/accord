@@ -2,7 +2,7 @@
 
 require "bigdecimal"
 
-RSpec.describe Accord::Types::Percentage do
+describe Accord::Types::Percentage do
   subject(:type) { described_class.new }
 
   it "is a Decimal defaulting to scale 2" do

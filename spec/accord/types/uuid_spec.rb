@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe Accord::Types::UUID do
+describe Accord::Types::UUID do
   subject(:type) { described_class.new }
 
   let(:canonical) { "550e8400-e29b-41d4-a716-446655440000" }

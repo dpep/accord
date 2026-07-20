@@ -2,7 +2,7 @@
 
 require "accord/notifications"
 
-RSpec.describe Accord::Notifications do
+describe Accord::Notifications do
   let(:schema) do
     Class.new(Accord::Schema) do
       currency :salary

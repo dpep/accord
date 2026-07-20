@@ -2,7 +2,7 @@
 
 require "accord/i18n"
 
-RSpec.describe Accord::Messages do
+describe Accord::Messages do
   let(:schema) do
     Class.new(Accord::Schema) do
       string :name, :required

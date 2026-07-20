@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe "type registry" do
+describe "type registry" do
   it "registers the built-ins and generates a DSL method for each" do
     expect(Accord::Types.registered?(:currency)).to be(true)
     expect(Accord::Schema).to respond_to(:currency, :datetime, :uuid)

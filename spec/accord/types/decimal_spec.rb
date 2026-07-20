@@ -2,7 +2,7 @@
 
 require "bigdecimal"
 
-RSpec.describe Accord::Types::Decimal do
+describe Accord::Types::Decimal do
   subject(:type) { described_class.new(scale: 4) }
 
   describe "accepted inputs" do

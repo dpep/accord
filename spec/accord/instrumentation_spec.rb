@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe "permissive-parse instrumentation" do
+describe "permissive-parse instrumentation" do
   recorder = Struct.new(:events) do
     def instrument(event, **payload)
       events << { event:, payload: }

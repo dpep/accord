@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe Accord::Types::Boolean do
+describe Accord::Types::Boolean do
   subject(:type) { described_class.new }
 
   describe "strict" do

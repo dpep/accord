@@ -2,7 +2,7 @@
 
 require "bigdecimal"
 
-RSpec.describe Accord::Types::Currency do
+describe Accord::Types::Currency do
   subject(:type) { described_class.new }
 
   it "defaults to scale 2" do

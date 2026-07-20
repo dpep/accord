@@ -23,6 +23,10 @@ RSpec.configure do |config|
 
   config.expect_with(:rspec) { |c| c.syntax = :expect }
   config.disable_monkey_patching!
+  # ...but keep the bare top-level `describe` (disable_monkey_patching! turns off
+  # the object-space `should`/stub patches AND the global DSL; re-enable just the
+  # DSL so specs read `describe`, not `describe`).
+  config.expose_dsl_globally = true
   config.order = :random
   Kernel.srand config.seed
 end

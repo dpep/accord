@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe Accord::Types::ISOCurrency do
+describe Accord::Types::ISOCurrency do
   subject(:type) { described_class.new }
 
   describe "canonicalization" do

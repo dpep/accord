@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe Accord::Error do
+describe Accord::Error do
   it "exposes its structured attributes" do
     error = described_class.new(
       path: [:discount], code: :too_small, validator: :min, value: -5, expected: 0,

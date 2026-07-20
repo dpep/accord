@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe "OpenAPI projection" do
+describe "OpenAPI projection" do
   describe "Schema.openapi" do
     it "builds an object schema with properties, required, and validator constraints" do
       stub_const("CreateEmployee", Class.new(Accord::Schema) do

@@ -10,7 +10,7 @@ require "json"
 # is that the refs rswag emits resolve to the components Accord generates. (A
 # literal rswag run additionally needs a Rack app + request specs; this
 # exercises the contract they share.)
-RSpec.describe "OpenAPI / rswag integration" do
+describe "OpenAPI / rswag integration" do
   before do
     stub_const("Address", Class.new(Accord::Schema) do
       string :city, :required

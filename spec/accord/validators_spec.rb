@@ -2,7 +2,7 @@
 
 require "bigdecimal"
 
-RSpec.describe "validation framework" do
+describe "validation framework" do
   def schema(&block)
     Class.new(Accord::Schema, &block)
   end

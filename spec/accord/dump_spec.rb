@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe "Schema#dump" do
+describe "Schema#dump" do
   it "emits canonical external values — the inverse of parse" do
     stub_const("Address", Class.new(Accord::Schema) { string :city })
     schema = Class.new(Accord::Schema) do

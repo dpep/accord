@@ -2,7 +2,7 @@
 
 require "bigdecimal"
 
-RSpec.describe "nested schemas" do
+describe "nested schemas" do
   let(:address) do
     Class.new(Accord::Schema) do
       string :city, required: true

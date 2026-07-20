@@ -6,7 +6,7 @@ require "tapioca/dsl/compilers/accord_schema"
 
 # Drives the Tapioca DSL compiler's #decorate directly and prints the RBI,
 # exercising the real generation logic without shelling out to the sorbet binary.
-RSpec.describe Tapioca::Dsl::Compilers::AccordSchema do
+describe Tapioca::Dsl::Compilers::AccordSchema do
   def rbi_for(constant)
     file = RBI::File.new(strictness: "strong")
     pipeline = Tapioca::Dsl::Pipeline.new(requested_constants: [], requested_compilers: [described_class])

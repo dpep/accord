@@ -2,7 +2,7 @@
 
 require "accord/controller_helpers"
 
-RSpec.describe Accord::ControllerHelpers do
+describe Accord::ControllerHelpers do
   let(:schema) do
     Class.new(Accord::Schema) do
       string :name, required: true

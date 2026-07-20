@@ -2,7 +2,7 @@
 
 require "bigdecimal"
 
-RSpec.describe Accord::Types::Duration do
+describe Accord::Types::Duration do
   subject(:type) { described_class.new }
 
   it "defaults to hours at scale 2" do

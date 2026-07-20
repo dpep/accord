@@ -2,7 +2,7 @@
 
 require "bigdecimal"
 
-RSpec.describe "coercion observability (permissive -> strict)" do
+describe "coercion observability (permissive -> strict)" do
   recorder = Struct.new(:events) do
     def instrument(event, **payload)
       events << { event:, payload: }

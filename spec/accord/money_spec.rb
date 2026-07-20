@@ -2,7 +2,7 @@
 
 require "money"
 
-RSpec.describe "money type" do
+describe "money type" do
   let(:usd) { Money.from_amount(BigDecimal("1234.50"), "USD") }
 
   describe "nested wire format (default)" do

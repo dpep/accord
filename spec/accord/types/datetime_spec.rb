@@ -2,7 +2,7 @@
 
 require "time"
 
-RSpec.describe Accord::Types::DateTime do
+describe Accord::Types::DateTime do
   subject(:type) { described_class.new }
 
   describe "accepted inputs" do

@@ -2,7 +2,7 @@
 
 require "bigdecimal"
 
-RSpec.describe Accord::Schema do
+describe Accord::Schema do
   let(:schema) do
     Class.new(described_class) do
       string :name, required: true
