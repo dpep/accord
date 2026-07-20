@@ -27,8 +27,13 @@ module Accord
         value&.upcase
       end
 
+      # Document the *format*, not the full ~200-code enum — inlining every code
+      # into every currency field dwarfs the rest of the doc, and consumers know
+      # ISO-4217. Runtime coercion still enforces validity. When a field narrows
+      # the set with `inclusion [...]`, that validator contributes the small enum
+      # (it merges over this), so restricted fields still enumerate.
       def openapi
-        { type: "string", enum: self.class.codes, example: "USD" }
+        { type: "string", format: "iso-4217", example: "USD" }
       end
 
       private

@@ -208,7 +208,7 @@ describe "money type" do
 
       expect(schema[:type]).to eq("object")
       expect(schema[:properties][:amount]).to eq(type: "string", format: "decimal")
-      expect(schema[:properties][:currency][:enum]).to include("USD")
+      expect(schema[:properties][:currency]).to eq(type: "string", format: "iso-4217", example: "USD")
       expect(schema[:required]).to contain_exactly(:amount, :currency)
     end
   end

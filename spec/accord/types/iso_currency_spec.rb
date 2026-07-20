@@ -28,11 +28,14 @@ describe Accord::Types::ISOCurrency do
   end
 
   describe "#openapi" do
-    it "describes a string enum of ISO-4217 codes" do
+    it "documents the ISO-4217 format, not the full code enum" do
       schema = type.openapi
-      expect(schema[:type]).to eq("string")
-      expect(schema[:enum]).to include("USD", "EUR", "GBP")
-      expect(schema[:example]).to eq("USD")
+      expect(schema).to eq(type: "string", format: "iso-4217", example: "USD")
+    end
+
+    it "enumerates only the restricted set when a field narrows it with inclusion" do
+      field = Class.new(Accord::Schema) { iso_currency(:ccy) { inclusion %w[USD MXN] } }.fields[:ccy]
+      expect(field.openapi).to include(type: "string", format: "iso-4217", enum: %w[USD MXN])
     end
   end
 end
