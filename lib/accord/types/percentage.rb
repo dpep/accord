@@ -12,7 +12,9 @@ module Accord
     #     between 0..100
     #   end
     class Percentage < Decimal
-      FORMATTING = /[%\s]/
+      # A trailing `%`, optionally preceded by whitespace — anchored, so a `%`
+      # anywhere else is not stripped (and therefore rejected).
+      TRAILING_SYMBOL = /\s*%\z/
 
       def initialize(scale: 2, round: false)
         super
@@ -24,13 +26,14 @@ module Accord
 
       private
 
-      # Strict percentage accepts plain numeric strings only; permissive strips a
-      # `%` sign first (`"50%"` -> BigDecimal("50")), mirroring how Currency
-      # strips `$`.
+      # Strict percentage accepts plain numeric strings only; permissive trims
+      # surrounding whitespace and strips a trailing `%` (`"50%"` -> 50),
+      # mirroring how Currency strips a leading `$` — so `"5%0"` and `"%50"` are
+      # rejected.
       def parse_string(str, strict:)
         return super if strict
 
-        cleaned = str.gsub(FORMATTING, "")
+        cleaned = str.strip.sub(TRAILING_SYMBOL, "")
         invalid!(str) unless cleaned.match?(NUMERIC)
 
         cleaned

@@ -12,7 +12,9 @@ module Accord
     #   currency :salary            # scale: 2
     #   currency :bonus, scale: 4
     class Currency < Decimal
-      FORMATTING = /[$,\s]/
+      # A leading `$`, optionally followed by whitespace — anchored, so a `$`
+      # anywhere else is not stripped (and therefore rejected).
+      LEADING_SYMBOL = /\A\$\s*/
 
       def initialize(scale: 2, round: false)
         super
@@ -24,12 +26,14 @@ module Accord
 
       private
 
-      # Strict currency accepts plain numeric strings only; permissive strips
-      # currency formatting first.
+      # Strict currency accepts plain numeric strings only; permissive trims
+      # surrounding whitespace, strips a leading `$` and thousands-separator
+      # commas, then requires a plain number — so `"1$234"`, `"12 34"`, `"$$5"`
+      # are rejected.
       def parse_string(str, strict:)
         return super if strict
 
-        cleaned = str.gsub(FORMATTING, "")
+        cleaned = str.strip.sub(LEADING_SYMBOL, "").delete(",")
         invalid!(str) unless cleaned.match?(NUMERIC)
 
         cleaned

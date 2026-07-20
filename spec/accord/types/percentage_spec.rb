@@ -16,12 +16,23 @@ describe Accord::Types::Percentage do
   end
 
   describe "% stripping" do
-    it "strips a % sign when permissive" do
+    it "strips a trailing % (optionally spaced) and surrounding whitespace" do
       expect(type.parse("50%")).to eq(BigDecimal("50"))
+      expect(type.parse("50 %")).to eq(BigDecimal("50"))
+      expect(type.parse("  50%  ")).to eq(BigDecimal("50"))
+      expect(type.parse("50")).to eq(BigDecimal("50"))
     end
 
     it "rejects a % sign in strict mode" do
       expect { type.parse!("50%") }.to raise_error(Accord::CoercionError)
+    end
+
+    it "rejects a % anywhere but the end" do
+      expect(type.parse("5%0")).to be_nil     # % in the middle
+      expect(type.parse("%50")).to be_nil     # leading %
+      expect(type.parse("50%%")).to be_nil    # doubled symbol
+      expect(type.parse("5 0")).to be_nil     # interior whitespace
+      expect(type.parse("%")).to be_nil       # symbol, no number
     end
   end
 

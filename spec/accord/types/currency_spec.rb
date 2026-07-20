@@ -21,9 +21,13 @@ describe Accord::Types::Currency do
       expect(type.parse!(BigDecimal("12.34"))).to eq(BigDecimal("12.34"))
     end
 
-    it "strips currency formatting when permissive" do
+    it "strips a leading $, thousands commas, and surrounding whitespace" do
       expect(type.parse("$12.00")).to eq(BigDecimal("12"))
       expect(type.parse("1,234.56")).to eq(BigDecimal("1234.56"))
+      expect(type.parse("$1,234.56")).to eq(BigDecimal("1234.56"))
+      expect(type.parse("$ 1234")).to eq(BigDecimal("1234"))
+      expect(type.parse("  $5  ")).to eq(BigDecimal("5"))
+      expect(type.parse("-5")).to eq(BigDecimal("-5"))
     end
   end
 
@@ -38,6 +42,15 @@ describe Accord::Types::Currency do
 
     it "returns nil in permissive mode for garbage" do
       expect(type.parse("$abc")).to be_nil
+    end
+
+    it "rejects a $ or whitespace anywhere but the front" do
+      expect(type.parse("1$234")).to be_nil    # $ in the middle
+      expect(type.parse("12 34")).to be_nil    # interior whitespace
+      expect(type.parse("$$5")).to be_nil      # doubled symbol
+      expect(type.parse("5$")).to be_nil       # trailing symbol
+      expect(type.parse("%5")).to be_nil       # wrong symbol
+      expect(type.parse("$")).to be_nil        # symbol, no amount
     end
   end
 
