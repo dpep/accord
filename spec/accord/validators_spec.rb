@@ -111,21 +111,34 @@ describe "validation framework" do
     end
   end
 
-  describe "resilience" do
-    it "collects a :validator_error when a validator raises, instead of propagating" do
-      s = schema { string(:name) { positive } }   # `positive` on a String -> NoMethodError
-      result = s.parse({ name: "Ada" })
-
-      expect(result).not_to be_valid
-      error = result.errors.first
-      expect(error.code).to eq(:validator_error)
-      expect(error.validator).to eq(:positive)
-      expect(error.metadata).to include(exception: "NoMethodError")
+  describe "applicability (fail fast at declaration)" do
+    it "rejects a numeric validator on a non-numeric type" do
+      expect { schema { string(:name) { positive } } }
+        .to raise_error(ArgumentError, /positive/)
+      expect { schema { boolean(:flag) { min 0 } } }
+        .to raise_error(ArgumentError, /min/)
     end
 
-    it "collects even in strict mode — validations never fail fast" do
-      s = schema { string(:name) { positive } }
-      expect { s.parse({ name: "Ada" }, strict: true) }.not_to raise_error
+    it "rejects a string validator on a non-string type" do
+      expect { schema { integer(:age) { length 1..3 } } }.to raise_error(ArgumentError)
+      expect { schema { integer(:age) { format(/\d/) } } }.to raise_error(ArgumentError)
+    end
+
+    it "allows applicable combinations, including comparable non-numeric types" do
+      expect { schema { integer(:age) { between 0..120 } } }.not_to raise_error
+      expect { schema { date(:on) { min Date.new(2000, 1, 1) } } }.not_to raise_error
+      expect { schema { string(:name) { length 1..50 } } }.not_to raise_error
+    end
+
+    it "leaves custom validators unrestricted" do
+      expect { schema { string(:x) { validate { |_v| } } } }.not_to raise_error
+    end
+
+    it "keeps a single Required when required is declared twice" do
+      s = schema { string :name, :required, required: true }
+      count = s.fields[:name].validators.count { |v| v.is_a?(Accord::Validators::Required) }
+
+      expect(count).to eq(1)
     end
   end
 

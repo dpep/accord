@@ -120,6 +120,14 @@ module Accord
       # errors and normalizes legacy input. Strict raises on the first coercion
       # failure — for trusted callers. A per-call `strict:` overrides the config.
       def parse(input, strict: Accord.config.strict, path: [])
+        # A non-nil, non-hash root (a JSON string/array/number) is a shape error,
+        # not "every field is missing" — mirror what nested object fields report.
+        if !input.nil? && !input.respond_to?(:key?)
+          raise CoercionError.new(code: :invalid_object, input:) if strict
+
+          return new._invalid_root(input, path)
+        end
+
         new._parse(input || {}, strict:, path:)
       end
 
@@ -272,6 +280,13 @@ module Accord
         @errors.concat(result.errors)
       end
 
+      self
+    end
+
+    # @api private — record a single root shape error (non-hash input) and stop.
+    def _invalid_root(input, path)
+      Accord.notify(:invalid_object, path:, input:)
+      @errors << Error.new(path:, code: :invalid_object, input:)
       self
     end
 

@@ -14,6 +14,17 @@ module Accord
       @type = type
     end
 
+    # Reject a validator that can't run against this field's type at declaration
+    # time — a misapplied rule (`positive` on a boolean) is a schema bug, so fail
+    # fast at boot rather than 500 on a request.
+    def add_validator(validator)
+      unless validator.applicable_to?(type)
+        raise ArgumentError, "`#{validator.name}` cannot validate #{type.type_name} field #{name.inspect}"
+      end
+
+      super
+    end
+
     def openapi
       schema = type.openapi.dup
       validators.each { |validator| schema.merge!(validator.openapi) }

@@ -40,6 +40,10 @@ module Accord
         "ISO8601Date"
       end
 
+      def value_class
+        ::Date
+      end
+
       private
 
       def coerce(value, strict:)

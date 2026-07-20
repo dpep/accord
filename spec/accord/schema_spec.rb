@@ -41,6 +41,18 @@ describe Accord::Schema do
     it "tolerates nil input" do
       expect(schema.parse(nil)).not_to be_valid
     end
+
+    it "reports a single shape error for non-hash root input, not per-field required" do
+      result = schema.parse("garbage")
+
+      expect(result).not_to be_valid
+      expect(result.errors.map(&:code)).to eq([:invalid_object])
+      expect(result.errors.first.input).to eq("garbage")
+    end
+
+    it "raises on non-hash root input in strict mode" do
+      expect { schema.parse([1, 2], strict: true) }.to raise_error(Accord::CoercionError)
+    end
   end
 
   describe "error aggregation" do

@@ -65,6 +65,10 @@ module Accord
         "String"
       end
 
+      def value_class
+        ::BigDecimal
+      end
+
       private
 
       def coerce(value, strict:)

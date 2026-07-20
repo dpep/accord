@@ -29,6 +29,10 @@ module Accord
         "String"
       end
 
+      def value_class
+        ::String
+      end
+
       private
 
       def coerce(value, strict:)

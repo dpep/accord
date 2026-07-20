@@ -28,9 +28,37 @@ module Accord
         {}
       end
 
+      # Whether this validator can meaningfully run against a field of the given
+      # type — checked at declaration time so a misapplied rule (e.g. `positive`
+      # on a boolean) fails fast at boot, not on a request. Default: yes; the
+      # type-specific mixins below narrow it. Custom validators can't be
+      # introspected, so they stay unrestricted.
+      def applicable_to?(_type)
+        true
+      end
+
       # Validator name used in structured errors and introspection, e.g. :min.
       def name
         self.class.name.to_s.split("::").last.to_s.gsub(/([a-z])([A-Z])/, '\1_\2').downcase.to_sym
+      end
+    end
+
+    # Applicability mixins keyed on the type's canonical value class.
+    module NumericOnly
+      def applicable_to?(type)
+        (klass = type.value_class) ? klass <= ::Numeric : false
+      end
+    end
+
+    module ComparableOnly
+      def applicable_to?(type)
+        (klass = type.value_class) ? klass.include?(::Comparable) : false
+      end
+    end
+
+    module StringOnly
+      def applicable_to?(type)
+        (klass = type.value_class) ? klass <= ::String : false
       end
     end
 
@@ -42,24 +70,32 @@ module Accord
     end
 
     class Positive < Base
+      include NumericOnly
+
       def validate(value, collector)
         collector.add(:not_positive) unless value.positive?
       end
     end
 
     class Negative < Base
+      include NumericOnly
+
       def validate(value, collector)
         collector.add(:not_negative) unless value.negative?
       end
     end
 
     class NonZero < Base
+      include NumericOnly
+
       def validate(value, collector)
         collector.add(:zero) if value.zero?
       end
     end
 
     class Min < Base
+      include ComparableOnly
+
       attr_reader :min
 
       def initialize(min)
@@ -76,6 +112,8 @@ module Accord
     end
 
     class Max < Base
+      include ComparableOnly
+
       attr_reader :max
 
       def initialize(max)
@@ -92,6 +130,8 @@ module Accord
     end
 
     class Between < Base
+      include ComparableOnly
+
       attr_reader :range
 
       def initialize(range)
@@ -110,6 +150,8 @@ module Accord
     end
 
     class Length < Base
+      include StringOnly
+
       attr_reader :range
 
       def initialize(range)
@@ -156,6 +198,8 @@ module Accord
     end
 
     class Format < Base
+      include StringOnly
+
       attr_reader :pattern
 
       def initialize(pattern)

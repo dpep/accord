@@ -72,6 +72,13 @@ module Accord
       raise NotImplementedError, "#{self.class} must implement #graphql"
     end
 
+    # The Ruby class of the canonical value, used to reject inapplicable
+    # validators at declaration time (e.g. `positive` on a boolean). nil when the
+    # value has no single class to check against (Boolean's true/false).
+    def value_class
+      nil
+    end
+
     # Short symbol name for a type, e.g. Accord::Types::Currency -> :currency.
     def type_name
       self.class.name.split("::").last.gsub(/([a-z])([A-Z])/, '\1_\2').downcase.to_sym

@@ -27,6 +27,10 @@ module Accord
         "Int"
       end
 
+      def value_class
+        ::Integer
+      end
+
       private
 
       def coerce(value, strict:)
