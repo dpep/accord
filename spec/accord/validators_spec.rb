@@ -31,9 +31,7 @@ describe "validation framework" do
 
     it "min" do
       s = schema { integer(:age) { min 18 } }
-      error = s.parse({ age: "5" }).errors.first
-      expect(error.code).to eq(:too_small)
-      expect(error.metadata).to eq(expected: 18)
+      expect(s.parse({ age: "5" })).to have_error(:too_small).at(:age).with(expected: 18)
     end
 
     it "max" do

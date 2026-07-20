@@ -133,11 +133,7 @@ describe "nested schemas" do
     end
 
     it "carries the element index in error paths" do
-      input = schema.parse({ ids: ["nope"] })
-
-      expect(input).not_to be_valid
-      expect(input.errors.first.path).to eq([:ids, 0])
-      expect(input.errors.first.code).to eq(:invalid_uuid)
+      expect(schema.parse({ ids: ["nope"] })).to have_error(:invalid_uuid).at(:ids, 0)
     end
 
     it "projects as an array of the scalar type" do

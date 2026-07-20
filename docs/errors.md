@@ -125,6 +125,22 @@ ActiveSupport::Notifications.subscribe(/accord\.parse/) do |name, _s, _f, _id, p
 end
 ```
 
+## Testing (RSpec matchers)
+
+`require "accord/rspec"` (opt-in) ships two matchers so you assert against the structured errors instead of digging through `errors.map(&:to_h)`:
+
+```ruby
+# a value satisfies a schema (e.g. a response body against a view contract)
+expect(response.parsed_body).to conform_to(EmployeeView)
+
+# a parsed result carries a specific error — chain .at (a varargs path) and .with (metadata)
+input = CreateEmployee.parse(params)
+expect(input).to have_error(:required).at(:name)
+expect(input).to have_error(:out_of_range).at(:employees, 2, :age).with(min: 18, max: 120)
+```
+
+(`be_valid` already works via RSpec's predicate matcher for the pass/fail case.)
+
 ---
 
 See also: [validation.md](validation.md) · [rails.md](rails.md#rendering-errors)

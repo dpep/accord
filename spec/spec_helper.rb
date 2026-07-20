@@ -13,6 +13,7 @@ if ENV["CI"] == "true" || ENV["CODECOV_TOKEN"]
 end
 
 require "accord"
+require "accord/rspec"   # the shipped matchers, dogfooded across the suite
 
 RSpec.configure do |config|
   # allow "fit" examples
