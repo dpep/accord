@@ -111,6 +111,24 @@ describe "validation framework" do
     end
   end
 
+  describe "resilience" do
+    it "collects a :validator_error when a validator raises, instead of propagating" do
+      s = schema { string(:name) { positive } }   # `positive` on a String -> NoMethodError
+      result = s.parse({ name: "Ada" })
+
+      expect(result).not_to be_valid
+      error = result.errors.first
+      expect(error.code).to eq(:validator_error)
+      expect(error.validator).to eq(:positive)
+      expect(error.metadata).to include(exception: "NoMethodError")
+    end
+
+    it "collects even in strict mode — validations never fail fast" do
+      s = schema { string(:name) { positive } }
+      expect { s.parse({ name: "Ada" }, strict: true) }.not_to raise_error
+    end
+  end
+
   describe "custom validators" do
     it "supports an inline validate block" do
       s = schema do
@@ -179,6 +197,20 @@ describe "validation framework" do
     it "format contributes pattern" do
       s = schema { string(:code) { format(/\A[A-Z]{3}\z/) } }
       expect(s.fields[:code].openapi).to include(pattern: "\\A[A-Z]{3}\\z")
+    end
+
+    it "omits the open bound of a beginless/endless between range" do
+      s = schema { integer(:n) { between 0.. } }
+      openapi = s.fields[:n].openapi
+      expect(openapi).to include(minimum: 0)
+      expect(openapi).not_to have_key(:maximum)
+    end
+
+    it "omits the open bound of an endless length range" do
+      s = schema { string(:name) { length 1.. } }
+      openapi = s.fields[:name].openapi
+      expect(openapi).to include(minLength: 1)
+      expect(openapi).not_to have_key(:maxLength)
     end
   end
 

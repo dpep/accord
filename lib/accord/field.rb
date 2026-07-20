@@ -169,17 +169,32 @@ module Accord
     end
 
     # Run this field's validators over a coerced value, collecting structured
-    # errors. Never raises — aggregation is the whole point.
+    # errors. Never raises — aggregation is the whole point, and a validator that
+    # blows up (a misapplied rule like `:positive` on a String, a buggy custom
+    # block) becomes a collected :validator_error rather than a 500.
     def validate_value(value, path)
       return [] if value.nil?
 
       validators.flat_map do |validator|
         collector = Validators::Collector.new
-        validator.validate(value, collector)
+        begin
+          validator.validate(value, collector)
+        rescue StandardError => e
+          next [validator_error(path, validator, value, e)]
+        end
         collector.violations.map do |violation|
           validation_error(path, validator, value, violation)
         end
       end
+    end
+
+    # A validator that raised — collected, never propagated (validations collect
+    # even in strict mode).
+    def validator_error(path, validator, value, exception)
+      full_path = path + [name]
+      metadata = { validator: validator.name, exception: exception.class.name }
+      Accord.notify(:validator_error, path: full_path, field: name, value:, **metadata)
+      Error.new(path: full_path, field: name, code: :validator_error, value:, **metadata)
     end
 
     def validation_error(path, validator, value, violation)

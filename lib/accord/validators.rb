@@ -102,8 +102,10 @@ module Accord
         collector.add(:out_of_range, min: range.begin, max: range.end) unless range.cover?(value)
       end
 
+      # A beginless/endless range omits the open bound rather than emitting a
+      # null one (invalid OpenAPI).
       def openapi
-        { minimum: range.begin, maximum: range.end }
+        { minimum: range.begin, maximum: range.end }.compact
       end
     end
 
@@ -118,8 +120,10 @@ module Accord
         collector.add(:invalid_length, min: range.begin, max: range.end) unless range.cover?(value.length)
       end
 
+      # A beginless/endless range omits the open bound rather than emitting a
+      # null one (invalid OpenAPI).
       def openapi
-        { minLength: range.begin, maxLength: range.end }
+        { minLength: range.begin, maxLength: range.end }.compact
       end
     end
 
