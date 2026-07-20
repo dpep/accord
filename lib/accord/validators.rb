@@ -28,37 +28,31 @@ module Accord
         {}
       end
 
+      # The methods this validator calls on a coerced value. A field rejects the
+      # validator at declaration unless the field type's #value_class defines them
+      # all — so a misapplied rule (`positive` on a boolean) fails fast at boot,
+      # not on a request. Declaring nothing (the default, and every custom
+      # validator) leaves it unrestricted.
+      def self.requires(*methods)
+        @required_methods = methods
+      end
+
+      def self.required_methods
+        @required_methods || []
+      end
+
       # Whether this validator can meaningfully run against a field of the given
-      # type — checked at declaration time so a misapplied rule (e.g. `positive`
-      # on a boolean) fails fast at boot, not on a request. Default: yes; the
-      # type-specific mixins below narrow it. Custom validators can't be
-      # introspected, so they stay unrestricted.
-      def applicable_to?(_type)
-        true
+      # type — see .requires.
+      def applicable_to?(type)
+        required = self.class.required_methods
+        return true if required.empty?
+
+        (klass = type.value_class) ? required.all? { |method| klass.method_defined?(method) } : false
       end
 
       # Validator name used in structured errors and introspection, e.g. :min.
       def name
         self.class.name.to_s.split("::").last.to_s.gsub(/([a-z])([A-Z])/, '\1_\2').downcase.to_sym
-      end
-    end
-
-    # Applicability mixins keyed on the type's canonical value class.
-    module NumericOnly
-      def applicable_to?(type)
-        (klass = type.value_class) ? klass <= ::Numeric : false
-      end
-    end
-
-    module ComparableOnly
-      def applicable_to?(type)
-        (klass = type.value_class) ? klass.include?(::Comparable) : false
-      end
-    end
-
-    module StringOnly
-      def applicable_to?(type)
-        (klass = type.value_class) ? klass <= ::String : false
       end
     end
 
@@ -70,7 +64,7 @@ module Accord
     end
 
     class Positive < Base
-      include NumericOnly
+      requires :positive?
 
       def validate(value, collector)
         collector.add(:not_positive) unless value.positive?
@@ -78,7 +72,7 @@ module Accord
     end
 
     class Negative < Base
-      include NumericOnly
+      requires :negative?
 
       def validate(value, collector)
         collector.add(:not_negative) unless value.negative?
@@ -86,7 +80,7 @@ module Accord
     end
 
     class NonZero < Base
-      include NumericOnly
+      requires :zero?
 
       def validate(value, collector)
         collector.add(:zero) if value.zero?
@@ -94,7 +88,7 @@ module Accord
     end
 
     class Min < Base
-      include ComparableOnly
+      requires :<
 
       attr_reader :min
 
@@ -112,7 +106,7 @@ module Accord
     end
 
     class Max < Base
-      include ComparableOnly
+      requires :>
 
       attr_reader :max
 
@@ -130,7 +124,7 @@ module Accord
     end
 
     class Between < Base
-      include ComparableOnly
+      requires :<=>
 
       attr_reader :range
 
@@ -150,7 +144,7 @@ module Accord
     end
 
     class Length < Base
-      include StringOnly
+      requires :length
 
       attr_reader :range
 
@@ -198,7 +192,7 @@ module Accord
     end
 
     class Format < Base
-      include StringOnly
+      requires :match?
 
       attr_reader :pattern
 

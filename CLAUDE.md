@@ -12,6 +12,10 @@ Executable API contracts for Ruby. A schema is the source of truth for an API bo
 
 **Errors are structured data, not strings.** Every `Accord::Error` carries `path`, `code`, `validator`, `value`, and validator-specific metadata (`expected`, `min`, `max`, …) — no message. Rendering (Rails JSON, GraphQL, i18n, logs) is a separate concern the validator layer knows nothing about. Nested schemas naturally produce nested paths (`[:employees, 3, :salary]`) with no special handling.
 
+**Distinguish client faults (4xx) from programmer/server faults (5xx).** Bad *data* — a client sending the wrong value, a missing required field, a non-object where a nested object is expected — is a client fault: collect it as a structured `Accord::Error` (a 4xx the caller renders), never raise. A misused *contract* — a schema declaring `positive` on a boolean, a default of the wrong type, a caller handing `parse` a non-hash root, a buggy custom validator that raises — is a programmer fault: **fail fast** with a plain Ruby exception (`ArgumentError`, etc.), at declaration/boot when possible, otherwise let it propagate as a 5xx. Don't dress a programmer bug up as a collectable 422, and don't swallow it. These are not i18n candidates.
+
+**Assume bad and hostile input is the norm.** Untrusted input is the whole point — expect malformed, wrong-typed, oversized, and adversarial data on every field, and be resilient to it: permissive parse never crashes, every edge routes through `invalid!`/a structured error, and non-finite/degenerate values are guarded. Error reporting must be *helpful* — precise `path`, specific `code`, the offending `value`/`input` — so a caller can act on it. Every accepted input, rejected input, edge case, and failure mode carries test coverage; a fix without a regression test isn't done.
+
 ## Type system
 
 A small set of primitives — `String`, `Boolean`, `Date`, `Decimal` — plus **semantic specializations** that add parsing rules, canonicalization, defaults, and OpenAPI metadata without introducing new internal representations. **Composite** types (e.g. `Money`) compose scalars via a field, not a new primitive:
