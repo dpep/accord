@@ -19,7 +19,7 @@ module Accord
 
       private
 
-      def canonicalize(string, strict:) # rubocop:disable Lint/UnusedMethodArgument
+      def canonicalize(string, strict:)
         uri = parse_uri(string.strip)
         invalid!(string) unless uri.host && SCHEMES.include?(uri.scheme&.downcase)
 

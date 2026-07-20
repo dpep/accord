@@ -10,13 +10,9 @@ module Accord
     # a single pattern match.
     #
     #   uuid :id
-    #   uuid :event_id, version: 7
-    #
-    # `version:` is part of the public API; version-specific validation is
-    # deferred to a later milestone.
+    #   uuid :event_id, version: 7   # rejects UUIDs that aren't version 7
     class UUID < String
       PATTERN = /\A\h{8}-\h{4}-\h{4}-\h{4}-\h{12}\z/
-      EXAMPLE = "550e8400-e29b-41d4-a716-446655440000"
 
       attr_reader :version
 
@@ -30,16 +26,22 @@ module Accord
       end
 
       def openapi
-        { type: "string", format: "uuid", example: EXAMPLE }
+        { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440000" }
       end
 
       private
 
-      def canonicalize(string, strict:) # rubocop:disable Lint/UnusedMethodArgument
+      def canonicalize(string, strict:)
         normalized = string.strip.downcase
         invalid!(string) unless normalized.match?(PATTERN)
+        invalid!(string) if version && version_of(normalized) != version
 
         normalized
+      end
+
+      # The UUID version: the first hex digit of the third group.
+      def version_of(uuid)
+        uuid[14].to_i(16)
       end
     end
   end

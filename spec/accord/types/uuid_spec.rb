@@ -43,8 +43,16 @@ RSpec.describe Accord::Types::UUID do
   end
 
   describe "version option" do
-    it "is accepted as part of the public API" do
+    it "reads the configured version" do
       expect(described_class.new(version: 7).version).to eq(7)
+    end
+
+    it "accepts a UUID of the required version" do
+      expect(described_class.new(version: 4).parse!(canonical)).to eq(canonical)  # canonical is v4
+    end
+
+    it "rejects a UUID of a different version" do
+      expect { described_class.new(version: 7).parse!(canonical) }.to raise_error(Accord::CoercionError)
     end
   end
 end

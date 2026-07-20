@@ -47,7 +47,7 @@ module Accord
 
       # Hook for semantic string types to normalize/validate a base String.
       # The base String type is identity.
-      def canonicalize(string, strict:) # rubocop:disable Lint/UnusedMethodArgument
+      def canonicalize(string, strict:)
         string
       end
     end

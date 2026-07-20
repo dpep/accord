@@ -15,6 +15,16 @@ RSpec.describe Accord::Types::Percentage do
     expect(type.dump(BigDecimal("12.5"))).to eq("12.50")
   end
 
+  describe "% stripping" do
+    it "strips a % sign when permissive" do
+      expect(type.parse("50%")).to eq(BigDecimal("50"))
+    end
+
+    it "rejects a % sign in strict mode" do
+      expect { type.parse!("50%") }.to raise_error(Accord::CoercionError)
+    end
+  end
+
   describe "#openapi" do
     it "is a decimal string tagged as a percentage" do
       expect(type.openapi).to eq(type: "string", format: "percentage")

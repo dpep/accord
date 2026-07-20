@@ -18,7 +18,7 @@ module Accord
 
       private
 
-      def canonicalize(string, strict:) # rubocop:disable Lint/UnusedMethodArgument
+      def canonicalize(string, strict:)
         normalized = string.strip.downcase
         invalid!(string) unless normalized.match?(PATTERN)
 

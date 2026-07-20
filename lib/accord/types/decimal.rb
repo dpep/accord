@@ -92,7 +92,7 @@ module Accord
       end
 
       # Plain decimal strings only. Currency overrides to strip formatting.
-      def parse_string(str, strict:) # rubocop:disable Lint/UnusedMethodArgument
+      def parse_string(str, strict:)
         cleaned = str.strip
         invalid!(str) unless cleaned.match?(NUMERIC)
 

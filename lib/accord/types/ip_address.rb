@@ -17,7 +17,7 @@ module Accord
 
       private
 
-      def canonicalize(string, strict:) # rubocop:disable Lint/UnusedMethodArgument
+      def canonicalize(string, strict:)
         ::IPAddr.new(string.strip).to_s
       rescue ::IPAddr::Error
         invalid!(string)

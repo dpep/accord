@@ -10,7 +10,7 @@ RSpec.describe "type registry" do
     shout_type = Class.new(Accord::Types::String) do
       private
 
-      def canonicalize(string, strict:) # rubocop:disable Lint/UnusedMethodArgument
+      def canonicalize(string, strict:)
         string.upcase
       end
     end

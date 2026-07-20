@@ -33,7 +33,7 @@ module Accord
 
       private
 
-      def canonicalize(string, strict:) # rubocop:disable Lint/UnusedMethodArgument
+      def canonicalize(string, strict:)
         normalized = string.strip.upcase
         invalid!(string) unless Money::Currency.find(normalized)
 
