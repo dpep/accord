@@ -176,8 +176,8 @@ module Accord
         properties = {}
         required = []
         fields.each_value do |field|
-          properties[field.name] = field.openapi
-          required << field.name if field.required?
+          properties.merge!(field.openapi_properties)
+          required.concat(field.openapi_required_keys)
         end
 
         schema = { type: "object", properties: }

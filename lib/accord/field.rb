@@ -97,6 +97,18 @@ module Accord
       raise NotImplementedError, "#{self.class} must implement #openapi"
     end
 
+    # The OpenAPI properties this field contributes to its parent object, and the
+    # keys it adds to the parent's `required` list. Almost every field owns a
+    # single key (its own name); flat money spans two sibling keys, so it
+    # overrides both.
+    def openapi_properties
+      { name => openapi }
+    end
+
+    def openapi_required_keys
+      required? ? [name] : []
+    end
+
     # The RBS type this field's reader returns, e.g. "String", "Array[Employee]".
     def rbs
       raise NotImplementedError, "#{self.class} must implement #rbs"

@@ -83,14 +83,34 @@ module Accord
       }
     end
 
+    # The canonical (nested) money object — its dump shape and the MoneyInput
+    # GraphQL component. The wire projection routes through #openapi_properties,
+    # which differs for the flat format.
     def openapi
-      currency = @fixed_currency ? { type: "string", enum: [@fixed_currency] } : @currency_type.openapi
-
       {
         type: "object",
-        properties: { amount: @amount_type.openapi, currency: },
+        properties: { amount: @amount_type.openapi, currency: currency_openapi },
         required: %i[amount currency],
       }
+    end
+
+    # Nested money is one object property; flat money is two sibling keys on the
+    # parent (`salary` + `salary_currency`), so document it as such.
+    def openapi_properties
+      return { name => openapi } if @format == :nested
+
+      { @amount_name => @amount_type.openapi, @currency.name => currency_openapi }
+    end
+
+    # The currency key is required only when the caller must supply it — not when
+    # it's fixed or defaulted.
+    def openapi_required_keys
+      return [] unless required?
+      return [name] if @format == :nested
+
+      keys = [@amount_name]
+      keys << @currency.name unless @fixed_currency || effective_default_currency
+      keys
     end
 
     def rbs
@@ -110,6 +130,11 @@ module Accord
     end
 
     private
+
+    # The currency property schema: a fixed enum, else the ISO-currency schema.
+    def currency_openapi
+      @fixed_currency ? { type: "string", enum: [@fixed_currency] } : @currency_type.openapi
+    end
 
     def coerce_money(input, raw, strict:, path:)
       component_input, component_path =

@@ -213,6 +213,30 @@ describe "money type" do
     end
   end
 
+  describe "OpenAPI projection into the parent schema" do
+    it "nested money is one object property" do
+      openapi = Class.new(Accord::Schema) { money :salary, :required }.openapi
+
+      expect(openapi[:properties].keys).to eq([:salary])
+      expect(openapi[:properties][:salary][:type]).to eq("object")
+      expect(openapi[:required]).to eq([:salary])
+    end
+
+    it "flat money is two sibling properties, matching the wire contract" do
+      openapi = Class.new(Accord::Schema) { money :salary, :required, format: :flat }.openapi
+
+      expect(openapi[:properties].keys).to contain_exactly(:salary, :salary_currency)
+      expect(openapi[:properties][:salary]).to eq(type: "string", format: "decimal")
+      expect(openapi[:required]).to contain_exactly(:salary, :salary_currency)
+    end
+
+    it "does not require the currency key when it's fixed" do
+      openapi = Class.new(Accord::Schema) { money :salary, :required, format: :flat, currency: "USD" }.openapi
+
+      expect(openapi[:required]).to eq([:salary])
+    end
+  end
+
   describe "introspection" do
     it "exposes its declarative config like any other field" do
       field = Accord::MoneyField.new(name: :salary, format: :flat, currency: "usd", round: true)
