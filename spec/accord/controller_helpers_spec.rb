@@ -217,6 +217,29 @@ describe Accord::ControllerHelpers do
     end
   end
 
+  describe ".controller_inputs" do
+    it "enumerates declared inputs per named controller" do
+      input = schema
+      controller = build_controller { accord :employee, input }
+      stub_const("EmployeesController", controller)
+
+      result = Accord::ControllerHelpers.controller_inputs([controller])
+
+      expect(result).to eq("EmployeesController" => { employee: input })
+    end
+
+    it "skips anonymous controllers and controllers with no declarations" do
+      input = schema
+      named_empty = build_controller
+      stub_const("EmptyController", named_empty)
+      anonymous = build_controller { accord :x, input }   # never named
+
+      result = Accord::ControllerHelpers.controller_inputs([named_empty, anonymous])
+
+      expect(result).to be_empty
+    end
+  end
+
   describe "render_accord_errors" do
     it "is overridable to customize the response" do
       input = schema

@@ -38,6 +38,23 @@ module Accord
       base.rescue_from(Accord::InvalidInput) { |error| render_accord_errors(error) }
     end
 
+    # Enumerate every controller's declared inputs, keyed by controller name:
+    #   { "EmployeesController" => { employee: CreateEmployee, batch: Schema::List }, ... }
+    # Discovery walks ActionController::Base.descendants, so eager-load the app
+    # first (`Rails.application.eager_load!`); pass an explicit list to scope it.
+    # The introspection hook for contract tooling and docs. Note this is
+    # per-controller (reader -> schema), not per-action — binding a reader to an
+    # action/verb would need an explicit annotation on the macro.
+    def self.controller_inputs(controllers = discover_controllers)
+      controllers
+        .select { |controller| controller.respond_to?(:accord_inputs) && controller.name && controller.accord_inputs.any? }
+        .to_h { |controller| [controller.name, controller.accord_inputs] }
+    end
+
+    def self.discover_controllers
+      defined?(::ActionController::Base) ? ::ActionController::Base.descendants : []
+    end
+
     module ClassMethods
       # Declare a memoized input reader backed by a schema. Pass a schema class,
       # or a block to define an anonymous schema inline:
