@@ -202,9 +202,12 @@ module Accord
     # A Decimal whose scale matches the resolved currency's subunit precision
     # (USD → 2, JPY → 0, BHD → 3), so excess precision is rejected per currency.
     # Falls back to the default scale when the currency couldn't be determined.
+    # Cached per scale — there are only a handful — so a parse doesn't rebuild a
+    # ScalarField + Decimal every time.
     def amount_field(currency)
       scale = currency.value ? Money::Currency.find(currency.value).exponent : Types::Decimal::DEFAULT_SCALE
-      ScalarField.new(name: @amount_name, type: Types::Decimal.new(scale:, round: @round), required: true)
+      (@amount_fields ||= {})[scale] ||=
+        ScalarField.new(name: @amount_name, type: Types::Decimal.new(scale:, round: @round), required: true)
     end
 
     def nested_shape_error(raw, strict:, path:)

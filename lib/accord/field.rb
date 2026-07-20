@@ -23,6 +23,7 @@ module Accord
 
     def initialize(name:, required: false, default: nil, description: nil, example: nil)
       @name = name
+      @name_string = name.to_s   # for string-keyed input lookups, computed once
       @default = default
       @description = description
       @example = example
@@ -67,7 +68,7 @@ module Accord
     def read(input)
       return [false, nil] unless input.respond_to?(:key?)
       return [true, input[name]] if input.key?(name)
-      return [true, input[name.to_s]] if input.key?(name.to_s)
+      return [true, input[@name_string]] if input.key?(@name_string)
 
       [false, nil]
     end
