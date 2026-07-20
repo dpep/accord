@@ -140,6 +140,36 @@ describe "accepts / returns contract DSL" do
     expect(parsed.components.schemas.keys).to include("CreateEmployee", "EmployeeView")
   end
 
+  it "gives responses reason-phrase descriptions and handles lists + no-content" do
+    require "openapi3_parser"
+    require "json"
+    stub_const("EmployeeView", Class.new(Accord::Schema) { string :name })
+    controller = controller_class do
+      returns 200 => [EmployeeView]
+      def index; end
+
+      returns 204 => nil
+      def destroy; end
+    end
+    stub_const("EmployeesController", controller)
+
+    routes = { index: ["GET", "/employees"], destroy: ["DELETE", "/employees/{id}"] }
+    doc = Accord::ControllerHelpers.openapi_document(
+      info: { title: "API", version: "1" },
+      endpoints: Accord::ControllerHelpers.endpoints([controller]),
+      resolver: ->(_c, action) { routes[action] },
+    )
+    parsed = Openapi3Parser.load(JSON.parse(JSON.generate(doc)))
+
+    expect(parsed.errors.to_a).to be_empty
+    list = parsed.paths["/employees"].get.responses["200"]
+    expect(list.description).to eq("OK")
+    expect(list.content["application/json"].schema.type).to eq("array")
+    no_content = parsed.paths["/employees/{id}"].delete.responses["204"]
+    expect(no_content.description).to eq("No Content")
+    expect(no_content.content["application/json"]).to be_nil
+  end
+
   it "renders invalid input for an accepts action as a 422 (dogfooding have_error)" do
     schema = employee_schema
     controller = controller_class do

@@ -11,6 +11,13 @@ module Accord
   module OpenAPI
     ERRORS_REF = { "$ref" => "#/components/responses/AccordErrors" }.freeze
 
+    # Reason phrases for a readable (and OpenAPI-required) response description.
+    STATUS_TEXT = {
+      200 => "OK", 201 => "Created", 202 => "Accepted", 204 => "No Content",
+      400 => "Bad Request", 401 => "Unauthorized", 403 => "Forbidden",
+      404 => "Not Found", 409 => "Conflict", 422 => "Unprocessable Entity",
+    }.freeze
+
     module_function
 
     def document(endpoints, info:)
@@ -38,8 +45,17 @@ module Accord
       return { "200" => { description: "OK" } } unless endpoint.returns?
 
       endpoint.returns.each_with_object({}) do |(status, contract), out|
-        out[status.to_s] = contract == :errors ? ERRORS_REF : { description: "", content: json(schema_ref(contract)) }
+        out[status.to_s] =
+          case contract
+          when :errors then ERRORS_REF
+          when nil then { description: status_text(status) }                                # e.g. 204, no body
+          else { description: status_text(status), content: json(schema_ref(contract)) }
+          end
       end
+    end
+
+    def status_text(status)
+      STATUS_TEXT[status] || status.to_s
     end
 
     def components(endpoints)
@@ -48,6 +64,8 @@ module Accord
       endpoints.each do |endpoint|
         collect(endpoint.accepts, schemas) if endpoint.accepts?
         endpoint.returns.each_value do |contract|
+          next if contract.nil?
+
           contract == :errors ? (uses_errors = true) : collect(contract, schemas)
         end
       end
