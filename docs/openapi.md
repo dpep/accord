@@ -89,7 +89,7 @@ RSpec.describe "Employees", type: :request do
   path "/employees" do
     post "Create an employee" do
       consumes "application/json"
-      parameter name: :employee, in: :body, schema: { "$ref" => "#/components/schemas/CreateEmployee" }
+      parameter name: :employee, in: :body, schema: CreateEmployee.openapi_ref   # => { "$ref" => "#/components/schemas/CreateEmployee" }
 
       response "201", "created" do
         let(:employee) { { name: "Ada", salary: "50000" } }

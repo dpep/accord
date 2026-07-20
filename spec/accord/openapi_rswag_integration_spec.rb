@@ -1,11 +1,15 @@
 # frozen_string_literal: true
 
+require "openapi3_parser"
+require "json"
+
 # Integration coverage for the rswag wiring documented in docs/openapi.md:
 # Accord fills `components.schemas` (via Accord.openapi_schemas), rswag describes
-# the paths, and they connect through `$ref`. We assemble that document here and
-# validate it end to end — the real risk is that the refs rswag emits resolve to
-# the components Accord generates. (A literal rswag run additionally needs a
-# Rack app + request specs; this exercises the contract they share.)
+# the paths, and they connect through `$ref` (built with Schema.openapi_ref). We
+# assemble that document and validate it with a real OpenAPI 3 parser — the risk
+# is that the refs rswag emits resolve to the components Accord generates. (A
+# literal rswag run additionally needs a Rack app + request specs; this
+# exercises the contract they share.)
 RSpec.describe "OpenAPI / rswag integration" do
   before do
     stub_const("Address", Class.new(Accord::Schema) do
@@ -22,8 +26,8 @@ RSpec.describe "OpenAPI / rswag integration" do
     end)
   end
 
-  # The `openapi_specs` document from docs/openapi.md: Accord components plus a
-  # path whose request body $refs a schema.
+  # The `openapi_specs` document from docs/openapi.md: Accord components, and a
+  # path whose request body $refs a schema via the Schema.openapi_ref helper.
   let(:document) do
     {
       openapi: "3.0.1",
@@ -32,9 +36,8 @@ RSpec.describe "OpenAPI / rswag integration" do
         "/employees" => {
           "post" => {
             requestBody: {
-              content: {
-                "application/json" => { schema: { "$ref" => "#/components/schemas/CreateEmployee" } },
-              },
+              required: true,
+              content: { "application/json" => { schema: CreateEmployee.openapi_ref } },
             },
             responses: { "201" => { description: "created" } },
           },
@@ -44,35 +47,29 @@ RSpec.describe "OpenAPI / rswag integration" do
     }
   end
 
+  # Normalize to string keys the way a JSON serializer would, then parse/validate.
+  let(:parsed) { Openapi3Parser.load(JSON.parse(JSON.generate(document))) }
+
+  it "is a valid OpenAPI 3 document" do
+    expect(parsed.errors.to_a).to be_empty
+    expect(parsed).to be_valid
+  end
+
   it "registers each schema plus its nested schemas as components" do
-    expect(document[:components][:schemas].keys).to contain_exactly("CreateEmployee", "Address")
+    expect(parsed.components.schemas.keys).to contain_exactly("CreateEmployee", "Address")
   end
 
-  it "projects field types, requireds, validator constraints, and nested $refs" do
-    employee = document[:components][:schemas]["CreateEmployee"]
-    address = document[:components][:schemas]["Address"]
+  it "resolves the request-body $ref (from openapi_ref) to the schema" do
+    schema = parsed.paths["/employees"].post.request_body.content["application/json"].schema
 
-    expect(employee[:type]).to eq("object")
-    expect(employee[:required]).to include(:name)
-    expect(employee[:properties][:salary]).to include(type: "string", format: "decimal")
-    expect(employee[:properties][:address]).to eq("$ref" => "#/components/schemas/Address")
-    expect(address[:properties][:zip]).to include(pattern: "\\A\\d{5}\\z")
+    expect(schema.properties.keys).to include("name", "salary", "address")
+    expect(schema.required).to include("name")
   end
 
-  it "resolves every $ref in the document to a defined component" do
-    keys = document[:components][:schemas].keys
-    refs = collect_refs(document)
+  it "resolves the nested $ref and carries validator constraints" do
+    address = parsed.components.schemas["CreateEmployee"].properties["address"]
 
-    expect(refs).to include("#/components/schemas/CreateEmployee", "#/components/schemas/Address")
-    refs.each { |ref| expect(keys).to include(ref.split("/").last) }
-  end
-
-  # Recursively gather every "$ref" value in the document (paths and components).
-  def collect_refs(node)
-    case node
-    when Hash then node.flat_map { |key, value| key.to_s == "$ref" ? [value] : collect_refs(value) }
-    when Array then node.flat_map { |element| collect_refs(element) }
-    else []
-    end
+    expect(address.properties.keys).to include("city", "zip")
+    expect(address.properties["zip"].pattern).to eq("\\A\\d{5}\\z")
   end
 end

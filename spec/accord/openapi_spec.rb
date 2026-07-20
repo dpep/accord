@@ -57,4 +57,15 @@ RSpec.describe "OpenAPI projection" do
       )
     end
   end
+
+  describe "Schema.openapi_ref" do
+    it "returns a $ref pointer to the schema's component" do
+      stub_const("Employee", Class.new(Accord::Schema) { string :name, :required })
+      expect(Employee.openapi_ref).to eq("$ref" => "#/components/schemas/Employee")
+    end
+
+    it "raises for an anonymous schema" do
+      expect { Class.new(Accord::Schema).openapi_ref }.to raise_error(ArgumentError)
+    end
+  end
 end

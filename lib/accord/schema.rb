@@ -164,6 +164,15 @@ module Accord
         schema
       end
 
+      # An OpenAPI `$ref` pointer to this schema's component — so hand-written
+      # paths and rswag request specs reference the contract without retyping the
+      # string: `parameter in: :body, schema: CreateEmployee.openapi_ref`.
+      def openapi_ref
+        raise ArgumentError, "cannot $ref an anonymous schema — give it a name" if name.nil?
+
+        { "$ref" => "#/components/schemas/#{name}" }
+      end
+
       # Every named schema in this schema's graph (itself plus nested object and
       # array schemas), keyed by class name — ready for an OpenAPI
       # `components: { schemas: ... }` section.

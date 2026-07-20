@@ -135,7 +135,7 @@ module Accord
     # An OpenAPI $ref to a named schema's component, or the inline schema for an
     # anonymous one.
     def openapi_ref(schema)
-      schema.name ? { "$ref" => "#/components/schemas/#{schema.name}" } : schema.openapi
+      schema.name ? schema.openapi_ref : schema.openapi
     end
 
     # The bare GraphQL type reference, without nullability. Subclasses supply it;
