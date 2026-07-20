@@ -261,7 +261,7 @@ CreateEmployee.parse!(params, strict: true)          # this boundary only
 Accord.configure { |c| c.strict = true }             # app-wide default; per-call strict: still wins
 ```
 
-Note the `accord` macro has no `strict:` option today — its reader always parses with the configured default — so a strict endpoint means calling `Schema.parse!(params, strict: true)` in the action rather than using the macro. In a gradual migration, prefer per-call `strict:` for a long time; the global flip is the *last* step, once every boundary is either strict-clean or deliberately split.
+The `accord` macro takes a per-endpoint `strict:` (`accord :employee, CreateEmployee, strict: true`), so a strict boundary doesn't force you off the macro — loose or missing input still renders a 422. In a gradual migration, prefer per-endpoint `strict:` for a long time; the global flip (`Accord.config.strict = true`) is the *last* step, once every boundary is either strict-clean or deliberately split.
 
 **Lock it down at boot.** Once the initializer reflects your final configuration, freeze it — a stray runtime mutation raises instead of racing ([`accord.rb`](../lib/accord.rb) `freeze!`):
 

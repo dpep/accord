@@ -196,6 +196,24 @@ describe Accord::ControllerHelpers do
       expect(child.accord_inputs).to have_key(:employee)
     end
 
+    it "parses strictly with strict: true, rendering loose input as a 422" do
+      input = Class.new(Accord::Schema) { boolean :active }
+      controller = build_controller { accord :flags, input, strict: true }.new({ active: "yes" })
+      controller.dispatch { flags }
+
+      expect(controller.rendered[:status]).to eq(:unprocessable_entity)
+      expect(controller.rendered[:json][:errors].first[:code]).to eq(:invalid_boolean)
+    end
+
+    it "renders a strict missing-required field as a 422" do
+      input = schema
+      controller = build_controller { accord :employee, input, strict: true }.new({})
+      controller.dispatch { employee }
+
+      expect(controller.rendered[:status]).to eq(:unprocessable_entity)
+      expect(controller.rendered[:json][:errors].first[:code]).to eq(:required)
+    end
+
     it "requires either a schema or a block" do
       expect { build_controller { accord :employee } }.to raise_error(ArgumentError)
     end

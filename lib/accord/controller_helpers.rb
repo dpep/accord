@@ -36,6 +36,10 @@ module Accord
       return unless base.respond_to?(:rescue_from)
 
       base.rescue_from(Accord::InvalidInput) { |error| render_accord_errors(error) }
+      # Strict mode raises on the first bad/missing value instead of collecting;
+      # at a request boundary that's still client bad data — render it as a 422.
+      base.rescue_from(Accord::MissingField) { |e| render_accord_errors(accord_fault_result(:required, field: e.field, path: [e.field])) }
+      base.rescue_from(Accord::CoercionError) { |e| render_accord_errors(accord_fault_result(e.code, input: e.input)) }
     end
 
     # Enumerate every controller's declared inputs, keyed by controller name:
@@ -78,7 +82,11 @@ module Accord
       # [CreateEmployee]` parses an array (the reader returns the parsed
       # elements, errors carrying each index: `[2, :salary]`) and mints a
       # projectable Schema::List constant, just like an inline block.
-      def accord(name, schema = nil, from: nil, const: nil, &block)
+      # `strict:` overrides the parse mode for this input (defaults to
+      # Accord.config.strict) — a per-endpoint strict boundary that rejects loose
+      # input, without leaving the macro for a manual `Schema.parse!` call. Loose
+      # or missing input on a strict input renders a 422 like any other bad data.
+      def accord(name, schema = nil, from: nil, const: nil, strict: nil, &block)
         input =
           if block
             raise ArgumentError, "accord :#{name} takes a schema or a block, not both" if schema
@@ -97,7 +105,7 @@ module Accord
           end
 
         accord_inputs[name] = input
-        define_method(name) { accord_input(name, input, from) }
+        define_method(name) { accord_input(name, input, from, strict) }
       end
 
       # The inputs declared on this controller, as `{ reader_name => schema }`
@@ -138,11 +146,19 @@ module Accord
       render json: { errors: error.errors.map(&:to_h) }, status: :unprocessable_entity
     end
 
-    def accord_input(name, schema, from)
+    # Wrap a strict-mode fault as one carrying a single structured error, so
+    # render_accord_errors sees the same `.errors` interface as InvalidInput.
+    def accord_fault_result(code, field: nil, path: [], input: nil)
+      errors = [Accord::Error.new(path:, field:, code:, input:)]
+      Struct.new(:errors).new(errors)
+    end
+
+    def accord_input(name, schema, from, strict = nil)
       @accord_input_cache ||= {}
       return @accord_input_cache[name] if @accord_input_cache.key?(name)
 
-      @accord_input_cache[name] = schema.parse!(accord_source(from))
+      options = strict.nil? ? {} : { strict: }
+      @accord_input_cache[name] = schema.parse!(accord_source(from), **options)
     end
 
     # Resolve the raw input for a declared schema. `from:` is a params key
