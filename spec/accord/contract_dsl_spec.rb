@@ -112,6 +112,34 @@ describe "accepts / returns contract DSL" do
     expect(endpoints.map(&:key)).to eq(["EmployeesController#create"])
   end
 
+  it "generates a valid OpenAPI document from the contracts" do
+    require "openapi3_parser"
+    require "json"
+    stub_const("CreateEmployee", Class.new(Accord::Schema) { string :name, :required })
+    stub_const("EmployeeView", Class.new(Accord::Schema) { string :name })
+    controller = controller_class do
+      accepts CreateEmployee
+      returns 201 => EmployeeView, 422 => :errors
+      def create = input
+    end
+    stub_const("EmployeesController", controller)
+
+    resolver = ->(_c, action) { action == :create ? ["POST", "/employees"] : nil }
+    doc = Accord::ControllerHelpers.openapi_document(
+      info: { title: "API", version: "1" },
+      endpoints: Accord::ControllerHelpers.endpoints([controller]),
+      resolver:,
+    )
+    parsed = Openapi3Parser.load(JSON.parse(JSON.generate(doc)))
+
+    expect(parsed.errors.to_a).to be_empty
+    post = parsed.paths["/employees"].post
+    expect(post.request_body.content["application/json"].schema.properties.keys).to include("name")
+    expect(post.responses["201"].content["application/json"].schema.properties.keys).to include("name")
+    expect(post.responses["422"]).not_to be_nil                                   # $ref AccordErrors, resolved
+    expect(parsed.components.schemas.keys).to include("CreateEmployee", "EmployeeView")
+  end
+
   it "renders invalid input for an accepts action as a 422 (dogfooding have_error)" do
     schema = employee_schema
     controller = controller_class do

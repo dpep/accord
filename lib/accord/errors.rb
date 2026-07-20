@@ -40,6 +40,30 @@ module Accord
     def hash
       to_h.hash
     end
+
+    # The OpenAPI schema for one structured error (the shape of #to_h), and for
+    # the default `{ errors: [ ... ] }` response body — so an API can document
+    # its 422s from the same source that produces them.
+    def self.openapi
+      {
+        type: "object",
+        properties: {
+          path: { type: "array", items: {} },
+          field: { type: "string" },
+          code: { type: "string" },
+          validator: { type: "string" },
+        },
+        required: %i[path code],
+      }
+    end
+
+    def self.openapi_response
+      {
+        type: "object",
+        properties: { errors: { type: "array", items: openapi } },
+        required: %i[errors],
+      }
+    end
   end
 
   # Base class for exceptions Accord raises.

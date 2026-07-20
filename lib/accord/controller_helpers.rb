@@ -4,6 +4,7 @@ require_relative "errors"
 require_relative "schema"
 require_relative "schema/list"
 require_relative "endpoint"
+require_relative "openapi"
 
 module Accord
   # Rails controller integration. The schema is the entry point — call
@@ -205,7 +206,7 @@ module Accord
 
         accord_endpoints[action] = Endpoint.new(
           controller: name, action:, accepts: schema, returns: resolve_returns(action, pending[:returns] || {}),
-          from: accepts && accepts[:from], strict: accepts && accepts[:strict], reader:,
+          from: accepts && accepts[:from], strict: accepts && accepts[:strict], reader:, verb: nil, path: nil,
         )
 
         # One action-dispatched reader (resolves the current action's contract),
@@ -248,6 +249,39 @@ module Accord
       controllers
         .select { |c| c.respond_to?(:accord_endpoints) && c.name }
         .flat_map { |c| c.accord_endpoints.values.map { |endpoint| endpoint.with(controller: c.name) } }
+    end
+
+    # Generate a full OpenAPI 3 document from the declared `accepts`/`returns`
+    # contracts — paths, components, and the shared AccordErrors response. Verb
+    # and path come from the router via `resolver` (a `->(controller, action) {
+    # [verb, path] }`), defaulting to Rails' routes; inject one to test or to
+    # scope generation. `Accord.freeze!` / eager-load first for a complete doc.
+    def self.openapi_document(info:, endpoints: self.endpoints, resolver: rails_route_resolver)
+      resolved = endpoints.map do |endpoint|
+        verb, path = resolver.call(endpoint.controller, endpoint.action)
+        verb && path ? endpoint.with(verb:, path:) : endpoint
+      end
+      Accord::OpenAPI.document(resolved, info:)
+    end
+
+    # A resolver over Rails' routes: controller class name + action -> [verb,
+    # OpenAPI path]. Returns nils outside Rails.
+    def self.rails_route_resolver
+      routes = defined?(::Rails) && ::Rails.respond_to?(:application) && ::Rails.application ? ::Rails.application.routes.routes : []
+      lambda do |controller, action|
+        route = routes.find { |r| r.defaults[:controller] == rails_controller_path(controller) && r.defaults[:action] == action.to_s }
+        route ? [route.verb, openapi_path(route.path.spec.to_s)] : nil
+      end
+    end
+
+    # "Admin::EmployeesController" -> "admin/employees"
+    def self.rails_controller_path(controller_name)
+      controller_name.to_s.sub(/Controller\z/, "").gsub("::", "/").gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase
+    end
+
+    # "/employees/:id(.:format)" -> "/employees/{id}"
+    def self.openapi_path(spec)
+      spec.sub(/\(\.:format\)\z/, "").gsub(/:(\w+)/, '{\1}')
     end
 
     private
