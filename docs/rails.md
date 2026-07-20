@@ -69,6 +69,20 @@ employee.to_h      # => { name: "Ada", email: "...", salary: ..., active: true, 
 
 `to_h` is a deep Hash of **typed** values (nested schemas recurse to Hashes too) — hand it to `Model.new`/`create!`. To **serialize** (render JSON), use `dump`, which emits the canonical *external* form — strings like `"65000.00"` and `"2026-01-15"`: `render json: employee.dump`.
 
+### Partial updates (PATCH)
+
+Accord distinguishes an **absent** field from one sent as **explicit null**, which is exactly the PATCH contract — an absent field is left untouched, a null clears it. An explicit null yields `nil` (skipping any default); `to_h(compact: true)` returns only the fields the request actually carried a key for (keeping nulls, dropping absent):
+
+```ruby
+def update
+  # PATCH /employees/1  { "email": null }   -> clears email, leaves everything else alone
+  Employee.find(params[:id]).update!(employee.to_h(compact: true))
+  head :no_content
+end
+```
+
+Use `input.present?(:field)` to test whether a key was supplied. (Plain `to_h` is the create shape — every field, defaults applied.)
+
 If the request is invalid, calling `employee` raises `Accord::InvalidInput`, which a `rescue_from` (installed when the concern is included) turns into a `422` with the structured errors — your action body never runs. A request like `POST /employees` with `{ "salary": "-5", "email": "nope" }` yields:
 
 ```json
