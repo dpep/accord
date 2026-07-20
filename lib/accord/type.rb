@@ -27,11 +27,21 @@ module Accord
       def openapi = instance.openapi
     end
 
-    # Canonical coercion entry used by schemas. Raises CoercionError.
+    # Canonical coercion entry used by schemas. Raises CoercionError. Surrounding
+    # whitespace on string input is trimmed here, once, for every type (`" 42 "`,
+    # `" true "`, `"  Ada  "`) — incidental whitespace is never canonical. Opt out
+    # per field where it's significant: `string :bio, strip: false`.
     def cast(value, strict:)
       return if value.nil?
 
+      value = value.strip if value.is_a?(::String) && strip_whitespace?
       coerce(value, strict:)
+    end
+
+    # Whether cast trims surrounding whitespace from string input. True for every
+    # type; the base String type honors a per-field `strip:` option.
+    def strip_whitespace?
+      true
     end
 
     # Strict: raises on invalid input.

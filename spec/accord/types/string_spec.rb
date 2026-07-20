@@ -3,6 +3,16 @@
 describe Accord::Types::String do
   subject(:type) { described_class.new }
 
+  describe "whitespace" do
+    it "trims surrounding whitespace by default" do
+      expect(type.parse!("  Ada  ")).to eq("Ada")
+    end
+
+    it "preserves it with strip: false" do
+      expect(described_class.new(strip: false).parse!("  keep  ")).to eq("  keep  ")
+    end
+  end
+
   describe "accepted inputs" do
     it "passes strings through" do
       expect(type.parse!("hi")).to eq("hi")

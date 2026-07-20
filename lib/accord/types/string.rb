@@ -13,6 +13,18 @@ module Accord
     class String < Type
       COERCIBLE = [::String, ::Symbol, ::Numeric].freeze
 
+      # `strip: false` preserves surrounding whitespace (for free-text fields
+      # where it's significant); by default, like every type, it's trimmed.
+      def initialize(strip: true)
+        @strip = strip
+      end
+
+      # Default true — semantic subclasses that skip String's initializer (UUID)
+      # leave @strip nil and still strip.
+      def strip_whitespace?
+        @strip != false
+      end
+
       def openapi
         { type: "string" }
       end
