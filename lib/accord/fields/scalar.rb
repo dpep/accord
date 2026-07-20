@@ -33,6 +33,19 @@ module Accord
       schema
     end
 
+    # Coerce a static default to its canonical value and check it against the
+    # field's own validators — both at boot, so a bad default (`default: "yes"`
+    # for a boolean, or a default that violates `min`) is caught at declaration.
+    def check_default!
+      return self unless has_default? && !default.respond_to?(:call)
+
+      @default = coerce_default(default)
+      errors = validate_value(@default, [])
+      return self if errors.empty?
+
+      raise ArgumentError, "default #{default.inspect} for #{name.inspect} violates #{errors.map(&:code).join(", ")}"
+    end
+
     def dump(value)
       type.dump(value)
     end
@@ -50,6 +63,21 @@ module Accord
     end
 
     private
+
+    # Proc defaults are coerced when they run (their value isn't known at boot);
+    # static defaults were already coerced in #check_default!.
+    def resolve_default
+      value = super
+      default.respond_to?(:call) ? coerce_default(value) : value
+    end
+
+    # Defaults coerce permissively, like input (so `default: "yes"` is a valid
+    # boolean), but an uncoercible default is a declaration error.
+    def coerce_default(value)
+      type.cast(value, strict: false)
+    rescue CoercionError
+      raise ArgumentError, "default #{value.inspect} for #{name.inspect} is not a valid #{type.type_name}"
+    end
 
     def coerce_present(raw, strict:, path:)
       value = type.cast(raw, strict:)

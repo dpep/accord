@@ -104,6 +104,7 @@ module Accord
       def register_field(field, flags, &block)
         flags.each { |flag| field.add_validator(Validators.build(flag)) }
         field.configure(&block)
+        field.check_default!
         register(field)
       end
 

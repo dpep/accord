@@ -225,6 +225,34 @@ describe Accord::Schema do
     end
   end
 
+  describe "defaults" do
+    it "coerces a non-canonical default to the field's type" do
+      klass = Class.new(described_class) do
+        boolean :active, default: "yes"
+        integer :count, default: "5"
+      end
+
+      input = klass.parse({})
+      expect(input.active).to be(true)
+      expect(input.count).to eq(5)
+    end
+
+    it "coerces a proc default when it runs" do
+      klass = Class.new(described_class) { boolean :active, default: -> { "no" } }
+      expect(klass.parse({}).active).to be(false)
+    end
+
+    it "rejects a default of the wrong type at declaration" do
+      expect { Class.new(described_class) { boolean :flag, default: "nonsense" } }
+        .to raise_error(ArgumentError, /default/)
+    end
+
+    it "rejects a default that violates the field's validators at declaration" do
+      expect { Class.new(described_class) { integer :n, default: -5, min: 0 } }
+        .to raise_error(ArgumentError, /default/)
+    end
+  end
+
   describe ".field" do
     it "declares a scalar field backed by an explicit type instance" do
       klass = Class.new(described_class) { field :code, Accord::Types::UUID.new, :required }

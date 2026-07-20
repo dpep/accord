@@ -55,6 +55,13 @@ module Accord
       self
     end
 
+    # Hook run once every validator is attached: normalize/verify a declared
+    # default. No-op by default; ScalarField coerces its default to the canonical
+    # value and checks it against the field's validators, failing fast at boot.
+    def check_default!
+      self
+    end
+
     # Read this field's raw value from an input hash, tolerating string or
     # symbol keys. Returns [present?, raw_value].
     def read(input)
