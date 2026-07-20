@@ -114,6 +114,7 @@ Where to go next:
 | Generate OpenAPI / wire up rswag | [OpenAPI](docs/openapi.md) |
 | Generate RBS / RBI for Sorbet or Steep | [Typing](docs/typing.md) |
 | Deserialize GraphQL input / serialize with RABL | [Integrations](docs/integrations.md) |
+| Adopt Accord in an existing Rails app | [Migration](docs/migration.md) |
 
 ## License
 
