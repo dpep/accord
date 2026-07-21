@@ -77,17 +77,35 @@ module Accord
         end
       end
 
-      # A nested schema. The parsed value is a sub-schema instance.
+      # A nested schema — a named class, or an anonymous one declared inline with
+      # a block (which can itself nest more anonymous objects/arrays). The block
+      # form takes field options as keywords (`object :address, required: true do
+      # … end`), since the block is the schema rather than a validator block.
       #   object :address, Address
-      def object(name, schema, *flags, **opts, &block)
+      #   object :address do string :city end
+      def object(name, schema = nil, *flags, **opts, &block)
+        if schema.nil?
+          raise ArgumentError, "object :#{name} needs a schema class or a block" unless block
+
+          return register_field(ObjectField.new(name:, schema: Class.new(Schema, &block), **opts), flags)
+        end
+        unless schema.is_a?(Class) && schema < Schema
+          raise ArgumentError, "object :#{name}: pass a schema class or a block (got #{schema.inspect}); for field options use keywords like `required: true`"
+        end
+
         register_field(ObjectField.new(name:, schema:, **opts), flags, &block)
       end
 
-      # A list whose element is a nested schema or a scalar type. Each element is
-      # parsed at its index.
+      # A list whose element is a nested schema (named or an inline anonymous
+      # block) or a scalar type. Each element is parsed at its index.
       #   array :employees, Employee     # list of objects
       #   array :tags, :string           # list of scalars
-      def array(name, element, *flags, **opts, &block)
+      #   array :phones do string :number end   # inline anonymous element
+      def array(name, element = nil, *flags, **opts, &block)
+        if element.nil? && block
+          return register_field(ArrayField.new(name:, element: Class.new(Schema, &block), **opts), flags)
+        end
+
         register_field(ArrayField.new(name:, element: array_element(name, element), **opts), flags, &block)
       end
 

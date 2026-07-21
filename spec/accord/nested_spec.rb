@@ -122,6 +122,39 @@ describe "nested schemas" do
     end
   end
 
+  describe "anonymous nested blocks" do
+    let(:schema) do
+      Class.new(Accord::Schema) do
+        object :address, required: true do
+          string :city, :required
+          array :phones do
+            string :number, :required
+          end
+        end
+      end
+    end
+
+    it "parses a fully-anonymous nested object + array" do
+      input = schema.parse({ address: { city: "Paris", phones: [{ number: "555" }] } })
+
+      expect(input).to be_valid
+      expect(input.address.city).to eq("Paris")
+      expect(input.address.phones.first.number).to eq("555")
+    end
+
+    it "threads error paths through the anonymous nesting" do
+      input = schema.parse({ address: { phones: [{}] } })
+
+      expect(input).to have_error(:required).at(:address, :city)
+      expect(input).to have_error(:required).at(:address, :phones, 0, :number)
+    end
+
+    it "rejects a bare object/array with neither a schema nor a block" do
+      expect { Class.new(Accord::Schema) { object :x } }.to raise_error(ArgumentError)
+      expect { Class.new(Accord::Schema) { object :x, :required } }.to raise_error(ArgumentError, /schema class or a block/)
+    end
+  end
+
   describe "arrays of scalars" do
     let(:schema) { Class.new(Accord::Schema) { array :tags, :string; array :ids, :uuid } }
 
