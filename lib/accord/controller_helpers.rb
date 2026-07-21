@@ -130,40 +130,34 @@ module Accord
 
       # The request contract for the next action. `as:` names the reader (default
       # Accord.config.input_reader, e.g. `input`); `from:`/`strict:` mirror the
-      # `accord` macro. A block declares an anonymous schema.
-      def accepts(schema = nil, from: nil, as: nil, strict: nil, &block)
+      # `accord` macro. A block declares an anonymous schema. `version:` labels
+      # this contract for a single controller serving multiple API versions —
+      # declare one accepts per version and the reader parses the one matching the
+      # request (see `accord_api_version`). The label is any value (`1`, `"2024-01"`).
+      def accepts(schema = nil, from: nil, as: nil, strict: nil, version: nil, &block)
         raise ArgumentError, "accepts takes a schema or a block, not both" if block && schema
         raise ArgumentError, "accepts needs a schema or a block" if schema.nil? && block.nil?
 
-        accord_pending_slot[:accepts] = { schema:, block:, from:, as:, strict: }
+        cross_check_accord_version!(schema, version)
+        accord_pending_slot(version)[:accepts] = { schema:, block:, from:, as:, strict: }
         nil
       end
 
       # The response contract(s) for the next action — `returns(200 => View, 422
       # => :errors)`, or `returns(201) { ... }` for an anonymous response schema.
-      def returns(responses = nil, &block)
-        slot = (accord_pending_slot[:returns] ||= {})
+      # A `version:` key labels the responses for that API version (a reserved
+      # key, not a status — statuses are Integers); the block form takes the
+      # version positionally: `returns(201, version) { ... }`.
+      def returns(responses = nil, version = nil, &block)
         if block
+          slot = (accord_pending_slot(version)[:returns] ||= {})
           slot[Integer(responses)] = { block: }
         else
+          version = responses.delete(:version)
+          slot = (accord_pending_slot(version)[:returns] ||= {})
           responses.each { |status, contract| slot[Integer(status)] = { contract: } }
         end
         nil
-      end
-
-      # Group the enclosed accepts/returns under an API version (a single
-      # controller serving multiple versions). The reader parses the version
-      # matching the request; each version projects to its own OpenAPI document.
-      #
-      #   version 1 do accepts V1::Create; returns 200 => V1::View end
-      #   version 2 do accepts V2::Create; returns 200 => V2::View end
-      def version(number)
-        raise ArgumentError, "version blocks don't nest" if @accord_version
-
-        @accord_version = number
-        yield
-      ensure
-        @accord_version = nil
       end
 
       # This controller's declared operations — an Array of Accord::Endpoint (one
@@ -180,15 +174,38 @@ module Accord
         return if pending.nil? || pending.empty?
 
         @accord_pending = nil
-        pending.each { |version, slot| build_accord_endpoint(action, slot, version) }
-        define_accepts_reader(action, pending)
+        build_accord_endpoints(action, pending)
       end
 
       private
 
-      # Pending accepts/returns for the current version context (nil = unversioned).
-      def accord_pending_slot
-        (@accord_pending ||= {})[@accord_version] ||= {}
+      # Pending accepts/returns for a version label (nil = unversioned).
+      def accord_pending_slot(version)
+        (@accord_pending ||= {})[version] ||= {}
+      end
+
+      # Turn an action's pending slots into endpoints. With versioned slots, an
+      # unversioned slot is treated as shared: its `returns` merge into every
+      # version (e.g. a common `422 => :errors`), and an unversioned `accepts`
+      # alongside versioned ones is ambiguous — reject it.
+      def build_accord_endpoints(action, pending)
+        shared = pending[nil]
+        versioned = pending.reject { |version, _| version.nil? }
+
+        if versioned.empty?
+          build_accord_endpoint(action, shared, nil)
+          return define_accepts_reader(action, pending)
+        end
+
+        if shared&.dig(:accepts)
+          raise ArgumentError, "#{action}: an unversioned `accepts` can't mix with versioned ones — give it a version:"
+        end
+
+        versioned.each do |version, slot|
+          slot = slot.merge(returns: (shared&.dig(:returns) || {}).merge(slot[:returns] || {})) if shared
+          build_accord_endpoint(action, slot, version)
+        end
+        define_accepts_reader(action, versioned)
       end
 
       # Name a generated schema (inline block or list) as a controller constant
@@ -238,9 +255,9 @@ module Accord
       # A schema class, a Schema::List for `[Schema]`, or a block named after the
       # action + version (`create` -> `CreateInput`, `create`@2 -> `CreateV2Input`).
       def resolve_accepts_schema(action, accepts, version = nil)
-        suffix = version ? "V#{version}Input" : "Input"
+        name = "#{accord_camelize(action)}#{version_suffix(version)}Input"
         if accepts[:block]
-          register_accord_schema(action, "#{accord_camelize(action)}#{suffix}") { Class.new(Schema, &accepts[:block]) }
+          register_accord_schema(action, name) { Class.new(Schema, &accepts[:block]) }
         elsif accepts[:schema].is_a?(Array)
           raise ArgumentError, "accepts [Schema] takes exactly one schema" if accepts[:schema].size != 1
 
@@ -251,14 +268,34 @@ module Accord
       end
 
       def resolve_returns(action, pending, version = nil)
-        suffix = version ? "V#{version}Response" : "Response"
+        name = "#{accord_camelize(action)}#{version_suffix(version)}Response"
         pending.transform_values do |spec|
           if spec[:block]
-            register_accord_schema(action, "#{accord_camelize(action)}#{suffix}") { Class.new(Schema, &spec[:block]) }
+            register_accord_schema(action, name) { Class.new(Schema, &spec[:block]) }
           else
             spec[:contract]
           end
         end
+      end
+
+      # A constant-safe version tag for auto-named anonymous schemas: nil -> "",
+      # `2` -> "V2", `"2024-01"` -> "V202401" (non-alphanumerics dropped).
+      def version_suffix(version)
+        return "" if version.nil?
+
+        "V#{version.to_s.gsub(/[^a-zA-Z0-9]/, "")}"
+      end
+
+      # A versioned `accepts` whose schema name suffixes `V<n>` must agree with the
+      # declared `version:` — a copy-paste guard, caught at load, not inference.
+      def cross_check_accord_version!(schema, version)
+        return unless version.is_a?(Integer) && schema.respond_to?(:name) && schema.name
+
+        suffix = schema.name[/V(\d+)\z/, 1]
+        return if suffix.nil? || suffix.to_i == version
+
+        raise ArgumentError,
+              "accepts #{schema.name} is version #{suffix} by name but declares version: #{version}"
       end
 
       def accord_camelize(name)

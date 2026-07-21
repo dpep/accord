@@ -11,7 +11,8 @@ module Accord
   #
   # Introspect via `Accord.endpoints` (all) or `Controller.accord_endpoints`.
   # `verb`/`path` are nil until an OpenAPI generator fills them from the router.
-  # `version` is nil unless declared inside a `version` block.
+  # `version` is nil unless the contract declared `version:` (a per-request API
+  # version label; the reader resolves the request's version to the match).
   Endpoint = Data.define(:controller, :action, :accepts, :returns, :from, :strict, :reader, :verb, :path, :version) do
     def accepts? = !accepts.nil?
     def returns? = !returns.empty?

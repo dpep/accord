@@ -21,7 +21,7 @@ module Accord
       @observe_coercions = false # emit accord.parse.coerced (permissive -> strict signal)
       @input_reader = :input   # default reader name for `accepts` (override per-action with `as:`)
       @default_phone_country_code = "1" # NANP (US/Canada); the `phone` type's default calling code
-      @version_header = "X-API-Version" # request header the `version` DSL reads by default
+      @version_header = "X-API-Version" # request header read to resolve a request's API version
       @version_resolver = nil  # override: a `->(controller) { ... }` (e.g. a version-lookup library)
     end
   end

@@ -196,23 +196,24 @@ end
 
 ### Versioning
 
-For a single controller serving multiple API versions, group each version's contract in a `version` block:
+For a single controller serving multiple API versions, label each contract with `version:` — one `accepts`/`returns` per version:
 
 ```ruby
-version 1 do
-  accepts CreateEmployeeV1
-  returns 201 => EmployeeViewV1
-end
-version 2 do
-  accepts CreateEmployeeV2
-  returns 201 => EmployeeViewV2
-end
-def create = render json: view.dump!(...), status: :created   # `input` resolves the request's version
+accepts CreateEmployeeV1, version: 1
+returns 201 => EmployeeViewV1, version: 1
+
+accepts CreateEmployeeV2, version: 2
+returns 201 => EmployeeViewV2, 202 => AsyncReceipt, version: 2
+
+returns 422 => :errors                                          # unversioned → shared by every version
+def create = render json: view.dump!(...), status: :created     # `input` resolves the request's version
 ```
 
-Suffix versioned schema classes (`CreateEmployeeV1`, not `V1::CreateEmployee`) — that's the convention Accord follows for auto-named anonymous version blocks too (`create` + `version 1` → `CreateV1Input`).
+`version:` is a plain label — an Integer, or any value (`"2024-01"`, `"v2"`). On `accepts` it's a keyword; on `returns` it's a reserved key inside the responses hash (statuses are Integers, so it can't collide). Suffix versioned schema classes (`CreateEmployeeV1`, not `V1::CreateEmployee`) — Accord follows the same convention for auto-named anonymous version blocks (`accepts version: 2 do … end` → `CreateV2Input`), and cross-checks a `V<n>`-suffixed name against the declared `version:` at load. An **unversioned** `returns` is shared into every version (handy for a common `422 => :errors`); an unversioned `accepts` alongside versioned ones is ambiguous and rejected.
 
-The reader parses the schema matching the request's version. Resolution reads a header by default (`Accord.config.version_header`, `"X-API-Version"`); set `Accord.config.version_resolver = ->(controller) { … }` to plug in a version-lookup library or custom logic. Each version projects to its **own** OpenAPI document — `Accord::ControllerHelpers.openapi_document(info:, version: 2)` — since a header can't vary a request body within one operation; unversioned endpoints are included in every version's doc.
+**Resolving a request's version.** One method decides it — `accord_api_version` — in order: (1) `Accord.config.version_resolver`, a `->(controller) { … }` proc (plug in a version-lookup library, parse an `Accept` header, read a URL segment/subdomain, look up a per-account pin — anything); (2) otherwise the request header `Accord.config.version_header` (default `"X-API-Version"`); (3) otherwise unversioned. The reader parses the contract whose `version:` matches (by string), falling back to the unversioned one. Override `accord_api_version` in a controller for one-off logic.
+
+Each version projects to its **own** OpenAPI document — `Accord::ControllerHelpers.openapi_document(info:, version: 2)` — since a header can't vary a request body within one operation; unversioned endpoints are included in every version's doc.
 
 ---
 

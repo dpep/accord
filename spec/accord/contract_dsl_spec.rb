@@ -183,13 +183,9 @@ describe "accepts / returns contract DSL" do
       v1 = V1Create
       v2 = V2Create
       controller_class do
-        version 1 do
-          accepts v1
-        end
-        version 2 do
-          accepts v2
-          returns 200 => v2
-        end
+        accepts v1, version: 1
+        accepts v2, version: 2
+        returns 200 => v2, version: 2
         def create = input
       end
     end
@@ -230,6 +226,69 @@ describe "accepts / returns contract DSL" do
 
       expect(v2[:components][:schemas].keys).to include("V2Create")
       expect(v2[:components][:schemas].keys).not_to include("V1Create")
+    end
+
+    it "shares an unversioned returns across every version" do
+      v1 = V1Create
+      v2 = V2Create
+      controller = controller_class do
+        returns 422 => :errors                # shared across versions
+        accepts v1, version: 1
+        returns 200 => v1, version: 1
+        accepts v2, version: 2
+        returns 200 => v2, version: 2
+        def create = input
+      end
+
+      controller.accord_endpoints.each do |endpoint|
+        expect(endpoint.returns[422]).to eq(:errors)
+      end
+    end
+
+    it "rejects an unversioned accepts mixed with versioned ones" do
+      v1 = V1Create
+      expect do
+        controller_class do
+          accepts v1                          # unversioned
+          accepts V2Create, version: 2
+          def create = input
+        end
+      end.to raise_error(ArgumentError, /can't mix/)
+    end
+
+    it "cross-checks a V-suffixed schema name against the declared version" do
+      stub_const("CreateEmployeeV2", Class.new(Accord::Schema) { string :name })
+      expect do
+        controller_class do
+          accepts CreateEmployeeV2, version: 1
+          def create = input
+        end
+      end.to raise_error(ArgumentError, /version/)
+    end
+
+    it "accepts a non-integer version label (e.g. a date)" do
+      controller = controller_class do
+        accepts V1Create, version: "2024-01"
+        def create = input
+      end
+      Accord.config.version_resolver = ->(_) { "2024-01" }
+      instance = controller.new({ name: "Ada" }).tap { |c| c.action_name = "create" }
+
+      expect(instance.input).to be_a(V1Create)
+    ensure
+      Accord.config.version_resolver = nil
+    end
+
+    it "auto-names an anonymous versioned block schema with the version suffix" do
+      controller = controller_class do
+        accepts version: 2 do
+          string :name, :required
+        end
+        def create = input
+      end
+      stub_const("OrdersController", controller)
+
+      expect(controller.accord_endpoints.first.accepts).to eq(OrdersController::CreateV2Input)
     end
   end
 
