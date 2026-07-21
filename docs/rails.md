@@ -192,7 +192,27 @@ end
 - **The reader** is `input` by default (rename per-action with `as:`, or globally with `Accord.config.input_reader`). It's action-dispatched — it parses whatever the current action declared — so it's a single method, not one per action. Because of that, `input` is polymorphic and can't be statically typed; a **`as:`-named** reader (unique per action) can be, so prefer `as:` when you want the Sorbet/RBI reader type.
 - `accepts` carries the same `from:`/`strict:`/`[Schema]`/block options as `accord`; a block schema is named from the action (`create` → `CreateInput`) so it projects.
 - **`returns`** maps `status => contract`, where a contract is a `Schema`, a `[Schema]` list, or a symbol naming a shared response (`:errors`). Responses are ordinary `Accord::Schema`s used in the dump direction — no separate serializer concept.
-- Introspect the whole graph: `Controller.accord_endpoints` (`{ action => Accord::Endpoint }`), or `Accord::ControllerHelpers.endpoints` across the app.
+- Introspect the whole graph: `Controller.accord_endpoints` (an Array of `Accord::Endpoint`), or `Accord::ControllerHelpers.endpoints` across the app.
+
+### Versioning
+
+For a single controller serving multiple API versions, group each version's contract in a `version` block:
+
+```ruby
+version 1 do
+  accepts CreateEmployeeV1
+  returns 201 => EmployeeViewV1
+end
+version 2 do
+  accepts CreateEmployeeV2
+  returns 201 => EmployeeViewV2
+end
+def create = render json: view.dump!(...), status: :created   # `input` resolves the request's version
+```
+
+Suffix versioned schema classes (`CreateEmployeeV1`, not `V1::CreateEmployee`) — that's the convention Accord follows for auto-named anonymous version blocks too (`create` + `version 1` → `CreateV1Input`).
+
+The reader parses the schema matching the request's version. Resolution reads a header by default (`Accord.config.version_header`, `"X-API-Version"`); set `Accord.config.version_resolver = ->(controller) { … }` to plug in a version-lookup library or custom logic. Each version projects to its **own** OpenAPI document — `Accord::ControllerHelpers.openapi_document(info:, version: 2)` — since a header can't vary a request body within one operation; unversioned endpoints are included in every version's doc.
 
 ---
 
