@@ -102,7 +102,16 @@ class OrdersController < ApplicationController
   accepts CreateOrderV2, version: 2
   returns 422 => :errors                 # unversioned -> shared by every version
   def create
-    order = Order.create!(input.to_h)    # `input` is the schema matching the request's version
+    # `input` is the schema matching the request's version (a CreateOrderV1 or
+    # CreateOrderV2); `accord_api_version` is the resolved label. Branch on it to
+    # handle the shapes that diverge.
+    order = Order.new(product_id: input.product_id, quantity: input.quantity)
+
+    if accord_api_version.to_s == "2" && input.coupon    # `coupon` exists only on the v2 schema
+      order.discount = Coupon.redeem(input.coupon)       # newer behavior, v2 clients only
+    end
+
+    order.save!
     render json: order, status: :created
   end
 end
