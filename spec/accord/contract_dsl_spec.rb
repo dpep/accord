@@ -28,7 +28,7 @@ describe "accepts / returns contract DSL" do
     end
     stub_const("EmployeesController", controller)
 
-    endpoint = controller.accord_endpoints[:create]
+    endpoint = controller.accord_endpoints.find { |e| e.action == :create }
     expect(endpoint.accepts).to eq(schema)
     expect(endpoint.action).to eq(:create)
 
@@ -71,7 +71,7 @@ describe "accepts / returns contract DSL" do
     stub_const("SearchController", controller)
 
     expect(SearchController::SearchInput.openapi[:properties]).to have_key(:term)
-    expect(controller.accord_endpoints[:search].accepts).to eq(SearchController::SearchInput)
+    expect(controller.accord_endpoints.find { |e| e.action == :search }.accepts).to eq(SearchController::SearchInput)
   end
 
   it "records returns as a status => contract map that composes with accepts" do
@@ -83,7 +83,7 @@ describe "accepts / returns contract DSL" do
       def create = input
     end
 
-    endpoint = controller.accord_endpoints[:create]
+    endpoint = controller.accord_endpoints.find { |e| e.action == :create }
     expect(endpoint.returns).to eq(201 => view, 422 => :errors)
     expect(endpoint.accepts).to eq(accepts_schema)
   end
@@ -95,7 +95,7 @@ describe "accepts / returns contract DSL" do
       def index; end
     end
 
-    endpoint = controller.accord_endpoints[:index]
+    endpoint = controller.accord_endpoints.find { |e| e.action == :index }
     expect(endpoint.accepts).to be_nil
     expect(endpoint.returns).to eq(200 => [view])
   end
@@ -168,6 +168,69 @@ describe "accepts / returns contract DSL" do
     no_content = parsed.paths["/employees/{id}"].delete.responses["204"]
     expect(no_content.description).to eq("No Content")
     expect(no_content.content["application/json"]).to be_nil
+  end
+
+  describe "single-controller versioning" do
+    before do
+      stub_const("V1Create", Class.new(Accord::Schema) { string :name, :required })
+      stub_const("V2Create", Class.new(Accord::Schema) do
+        string :name, :required
+        string :email
+      end)
+    end
+
+    def versioned_controller
+      v1 = V1Create
+      v2 = V2Create
+      controller_class do
+        version 1 do
+          accepts v1
+        end
+        version 2 do
+          accepts v2
+          returns 200 => v2
+        end
+        def create = input
+      end
+    end
+
+    it "records one endpoint per version" do
+      expect(versioned_controller.accord_endpoints.map(&:version)).to contain_exactly(1, 2)
+    end
+
+    it "parses the schema for the request's resolved version" do
+      controller = versioned_controller
+      Accord.config.version_resolver = ->(_) { 2 }
+      instance = controller.new({ name: "Ada", email: "a@x.co" })
+      instance.action_name = "create"
+
+      expect(instance.input).to be_a(V2Create)
+      expect(instance.input.email).to eq("a@x.co")
+    ensure
+      Accord.config.version_resolver = nil
+    end
+
+    it "resolves a different version to a different schema" do
+      controller = versioned_controller
+      Accord.config.version_resolver = ->(_) { 1 }
+      instance = controller.new({ name: "Ada" }).tap { |c| c.action_name = "create" }
+
+      expect(instance.input).to be_a(V1Create)
+    ensure
+      Accord.config.version_resolver = nil
+    end
+
+    it "generates a separate OpenAPI document per version" do
+      controller = versioned_controller
+      stub_const("EmployeesController", controller)
+      endpoints = Accord::ControllerHelpers.endpoints([controller])
+      resolver = ->(_c, action) { action == :create ? ["POST", "/employees"] : nil }
+
+      v2 = Accord::ControllerHelpers.openapi_document(info: { title: "API", version: "2" }, version: 2, endpoints:, resolver:)
+
+      expect(v2[:components][:schemas].keys).to include("V2Create")
+      expect(v2[:components][:schemas].keys).not_to include("V1Create")
+    end
   end
 
   it "renders invalid input for an accepts action as a 422 (dogfooding have_error)" do

@@ -46,7 +46,7 @@ module Tapioca
         def accord_readers
           readers = constant.respond_to?(:accord_inputs) ? constant.accord_inputs.dup : {}
 
-          endpoints = constant.respond_to?(:accord_endpoints) ? constant.accord_endpoints.values : []
+          endpoints = constant.respond_to?(:accord_endpoints) ? constant.accord_endpoints : []
           endpoints.select(&:accepts?).group_by(&:reader).each do |reader, group|
             schemas = group.map(&:accepts).uniq
             readers[reader] = schemas.first if schemas.size == 1   # skip polymorphic readers

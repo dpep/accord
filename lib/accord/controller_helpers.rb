@@ -135,39 +135,61 @@ module Accord
         raise ArgumentError, "accepts takes a schema or a block, not both" if block && schema
         raise ArgumentError, "accepts needs a schema or a block" if schema.nil? && block.nil?
 
-        accord_pending[:accepts] = { schema:, block:, from:, as:, strict: }
+        accord_pending_slot[:accepts] = { schema:, block:, from:, as:, strict: }
         nil
       end
 
       # The response contract(s) for the next action — `returns(200 => View, 422
       # => :errors)`, or `returns(201) { ... }` for an anonymous response schema.
       def returns(responses = nil, &block)
+        slot = (accord_pending_slot[:returns] ||= {})
         if block
-          accord_pending_returns[Integer(responses)] = { block: }
+          slot[Integer(responses)] = { block: }
         else
-          responses.each { |status, contract| accord_pending_returns[Integer(status)] = { contract: } }
+          responses.each { |status, contract| slot[Integer(status)] = { contract: } }
         end
         nil
       end
 
-      # This controller's declared operations, `{ action => Accord::Endpoint }` —
-      # introspectable, inherited by subclasses.
-      def accord_endpoints
-        @accord_endpoints ||= superclass.respond_to?(:accord_endpoints) ? superclass.accord_endpoints.dup : {}
+      # Group the enclosed accepts/returns under an API version (a single
+      # controller serving multiple versions). The reader parses the version
+      # matching the request; each version projects to its own OpenAPI document.
+      #
+      #   version 1 do accepts V1::Create; returns 200 => V1::View end
+      #   version 2 do accepts V2::Create; returns 200 => V2::View end
+      def version(number)
+        raise ArgumentError, "version blocks don't nest" if @accord_version
+
+        @accord_version = number
+        yield
+      ensure
+        @accord_version = nil
       end
 
-      # @api private — Ruby's hook, fired after every `def`. When an accepts/
-      # returns is pending, bind it to this action and clear the slot.
+      # This controller's declared operations — an Array of Accord::Endpoint (one
+      # per action, or per action+version). Introspectable, inherited.
+      def accord_endpoints
+        @accord_endpoints ||= superclass.respond_to?(:accord_endpoints) ? superclass.accord_endpoints.dup : []
+      end
+
+      # @api private — Ruby's hook, fired after every `def`. When accepts/returns
+      # are pending, bind them (per version) to this action and clear the slots.
       def method_added(action)
         super
         pending = @accord_pending
         return if pending.nil? || pending.empty?
 
         @accord_pending = nil
-        build_accord_endpoint(action, pending)
+        pending.each { |version, slot| build_accord_endpoint(action, slot, version) }
+        define_accepts_reader(action, pending)
       end
 
       private
+
+      # Pending accepts/returns for the current version context (nil = unversioned).
+      def accord_pending_slot
+        (@accord_pending ||= {})[@accord_version] ||= {}
+      end
 
       # Name a generated schema (inline block or list) as a controller constant
       # so it projects like a top-level schema. The default name (`:employee` ->
@@ -189,36 +211,36 @@ module Accord
         const_set(const, yield)
       end
 
-      def accord_pending
-        @accord_pending ||= {}
-      end
+      # Assemble one Endpoint for an action+version from its pending slot.
+      def build_accord_endpoint(action, slot, version)
+        accepts = slot[:accepts]
+        schema = accepts && resolve_accepts_schema(action, accepts, version)
 
-      def accord_pending_returns
-        accord_pending[:returns] ||= {}
-      end
-
-      # Assemble the Endpoint for an action from its pending accepts/returns and
-      # define the input reader.
-      def build_accord_endpoint(action, pending)
-        accepts = pending[:accepts]
-        schema = accepts && resolve_accepts_schema(action, accepts)
-        reader = (accepts && accepts[:as]) || Accord.config.input_reader
-
-        accord_endpoints[action] = Endpoint.new(
-          controller: name, action:, accepts: schema, returns: resolve_returns(action, pending[:returns] || {}),
-          from: accepts && accepts[:from], strict: accepts && accepts[:strict], reader:, verb: nil, path: nil,
+        accord_endpoints << Endpoint.new(
+          controller: name, action:, version:, accepts: schema,
+          returns: resolve_returns(action, slot[:returns] || {}, version),
+          from: accepts && accepts[:from], strict: accepts && accepts[:strict],
+          reader: (accepts && accepts[:as]) || Accord.config.input_reader, verb: nil, path: nil,
         )
+      end
 
-        # One action-dispatched reader (resolves the current action's contract),
-        # so several actions sharing the default name don't clobber each other.
-        define_method(reader) { accord_action_input } if accepts && !method_defined?(reader)
+      # Define the (version-dispatched) input reader for an action, once, if any
+      # version declares an accepts. Several actions sharing the default name
+      # don't clobber — the reader resolves the current action + request version.
+      def define_accepts_reader(action, pending)
+        accepts = pending.values.filter_map { |slot| slot[:accepts] }.first
+        return unless accepts
+
+        reader = accepts[:as] || Accord.config.input_reader
+        define_method(reader) { accord_action_input } unless method_defined?(reader)
       end
 
       # A schema class, a Schema::List for `[Schema]`, or a block named after the
-      # action (`create` -> `CreateInput`) so it projects.
-      def resolve_accepts_schema(action, accepts)
+      # action + version (`create` -> `CreateInput`, `create`@2 -> `CreateV2Input`).
+      def resolve_accepts_schema(action, accepts, version = nil)
+        suffix = version ? "V#{version}Input" : "Input"
         if accepts[:block]
-          register_accord_schema(action, "#{accord_camelize(action)}Input") { Class.new(Schema, &accepts[:block]) }
+          register_accord_schema(action, "#{accord_camelize(action)}#{suffix}") { Class.new(Schema, &accepts[:block]) }
         elsif accepts[:schema].is_a?(Array)
           raise ArgumentError, "accepts [Schema] takes exactly one schema" if accepts[:schema].size != 1
 
@@ -228,10 +250,11 @@ module Accord
         end
       end
 
-      def resolve_returns(action, pending)
+      def resolve_returns(action, pending, version = nil)
+        suffix = version ? "V#{version}Response" : "Response"
         pending.transform_values do |spec|
           if spec[:block]
-            register_accord_schema(action, "#{accord_camelize(action)}Response") { Class.new(Schema, &spec[:block]) }
+            register_accord_schema(action, "#{accord_camelize(action)}#{suffix}") { Class.new(Schema, &spec[:block]) }
           else
             spec[:contract]
           end
@@ -248,7 +271,7 @@ module Accord
     def self.endpoints(controllers = discover_controllers)
       controllers
         .select { |c| c.respond_to?(:accord_endpoints) && c.name }
-        .flat_map { |c| c.accord_endpoints.values.map { |endpoint| endpoint.with(controller: c.name) } }
+        .flat_map { |c| c.accord_endpoints.map { |endpoint| endpoint.with(controller: c.name) } }
     end
 
     # Generate a full OpenAPI 3 document from the declared `accepts`/`returns`
@@ -256,8 +279,12 @@ module Accord
     # and path come from the router via `resolver` (a `->(controller, action) {
     # [verb, path] }`), defaulting to Rails' routes; inject one to test or to
     # scope generation. `Accord.freeze!` / eager-load first for a complete doc.
-    def self.openapi_document(info:, endpoints: self.endpoints, resolver: rails_route_resolver)
-      resolved = endpoints.map do |endpoint|
+    # Pass `version:` to scope the document to one API version (header versioning
+    # can't vary a body by header in a single operation, so each version is its
+    # own document) — unversioned endpoints are always included.
+    def self.openapi_document(info:, version: nil, endpoints: self.endpoints, resolver: rails_route_resolver)
+      selected = version.nil? ? endpoints : endpoints.select { |e| e.version.nil? || e.version.to_s == version.to_s }
+      resolved = selected.map do |endpoint|
         verb, path = resolver.call(endpoint.controller, endpoint.action)
         verb && path ? endpoint.with(verb:, path:) : endpoint
       end
@@ -286,16 +313,31 @@ module Accord
 
     private
 
-    # The parsed input for the current action, from its `accepts` contract —
-    # memoized, raises InvalidInput (rendered 422) on invalid input.
+    # The parsed input for the current action + request version, from its
+    # `accepts` contract — memoized, raises InvalidInput (rendered 422) on invalid
+    # input.
     def accord_action_input
-      endpoint = self.class.accord_endpoints[action_name.to_sym]
-      raise ArgumentError, "no accord `accepts` contract for #{action_name}" unless endpoint&.accepts?
+      action = action_name.to_sym
+      version = accord_api_version
+      candidates = self.class.accord_endpoints.select { |e| e.action == action && e.accepts? }
+      endpoint = candidates.find { |e| e.version.to_s == version.to_s } || candidates.find { |e| e.version.nil? }
+      raise ArgumentError, "no accord `accepts` contract for #{action_name} (version #{version.inspect})" unless endpoint
 
       @accord_input_cache ||= {}
-      @accord_input_cache[action_name] ||= endpoint.accepts.parse!(
+      @accord_input_cache[[action, version]] ||= endpoint.accepts.parse!(
         accord_source(endpoint.from), **(endpoint.strict.nil? ? {} : { strict: endpoint.strict }),
       )
+    end
+
+    # The request's API version: the configured resolver proc, else the version
+    # header (`Accord.config.version_header`). Override per-controller if neither
+    # fits. nil for an unversioned request.
+    def accord_api_version
+      resolver = Accord.config.version_resolver
+      return resolver.call(self) if resolver
+      return request.headers[Accord.config.version_header] if respond_to?(:request) && request
+
+      nil
     end
 
     # Override in a controller to customize the 422 response.

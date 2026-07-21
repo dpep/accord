@@ -11,10 +11,11 @@ module Accord
   #
   # Introspect via `Accord.endpoints` (all) or `Controller.accord_endpoints`.
   # `verb`/`path` are nil until an OpenAPI generator fills them from the router.
-  Endpoint = Data.define(:controller, :action, :accepts, :returns, :from, :strict, :reader, :verb, :path) do
+  # `version` is nil unless declared inside a `version` block.
+  Endpoint = Data.define(:controller, :action, :accepts, :returns, :from, :strict, :reader, :verb, :path, :version) do
     def accepts? = !accepts.nil?
     def returns? = !returns.empty?
     def routed? = !verb.nil? && !path.nil?
-    def key = "#{controller}##{action}"
+    def key = version ? "#{controller}##{action}@v#{version}" : "#{controller}##{action}"
   end
 end
