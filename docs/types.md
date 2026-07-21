@@ -28,6 +28,7 @@ Inside a schema, permissive parsing collects a structured error instead of retur
 | `duration :hrs, unit: :hours` | `BigDecimal` | `Decimal` labeled with a time unit |
 | `ein :employer_id` | `String` | US EIN; canonical `XX-XXXXXXX` |
 | `email :contact` | `String` | canonical **lowercase**; pragmatic format check |
+| `iban :account` | `String` | international bank account; **mod-97 checksum**; canonical uppercase no-spaces |
 | `integer :age` | `Integer` | permissive accepts integer strings and whole Floats |
 | `ip_address :client_ip` | `String` | IPv4/IPv6; canonicalized via IPAddr |
 | `iso_currency :currency` | `String` | canonical **uppercase** ISO-4217 (`usd` → `USD`); needs `money` |
@@ -35,6 +36,7 @@ Inside a schema, permissive parsing collects a structured error instead of retur
 | `object :address, Address` | schema instance | nested schema |
 | `percentage :discount` | `BigDecimal` | `Decimal`, default `scale: 2` |
 | `phone :mobile` | `String` | NANP; canonical E.164 (`+15551234567`); `country_code:` configurable |
+| `postal_code :zip, country: :ca` | `String` | US/Canada postal code; `country:` (default `:us`); `zip_code` is the US alias |
 | `routing_number :aba` | `String` | US ABA; 9 digits, **checksum-validated** |
 | `ssn :taxpayer_id` | `String` | US SSN; canonical `AAA-GG-SSSS`; rejects invalid ranges |
 | `string :name` | `String` | permissive also coerces Symbol/Numeric via `to_s` |
