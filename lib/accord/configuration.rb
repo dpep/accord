@@ -11,7 +11,8 @@ module Accord
   # default is non-strict — an API boundary tolerates and reports; strict is
   # the trusted-internal-caller mode.
   class Configuration
-    attr_accessor :strict, :default_currency, :notifications, :observe_coercions, :input_reader
+    attr_accessor :strict, :default_currency, :notifications, :observe_coercions, :input_reader,
+                  :default_phone_country_code
 
     def initialize
       @strict = false
@@ -19,6 +20,7 @@ module Accord
       @notifications = true    # emit accord.parse.<code> error/rounding events
       @observe_coercions = false # emit accord.parse.coerced (permissive -> strict signal)
       @input_reader = :input   # default reader name for `accepts` (override per-action with `as:`)
+      @default_phone_country_code = "1" # NANP (US/Canada); the `phone` type's default calling code
     end
   end
 end

@@ -26,6 +26,7 @@ Inside a schema, permissive parsing collects a structured error instead of retur
 | `datetime :at` | `Time` | timestamp (keeps time-of-day/offset); ISO-8601 + `formats:` |
 | `decimal :rate, scale: 4` | `BigDecimal` | configurable precision |
 | `duration :hrs, unit: :hours` | `BigDecimal` | `Decimal` labeled with a time unit |
+| `ein :employer_id` | `String` | US EIN; canonical `XX-XXXXXXX` |
 | `email :contact` | `String` | canonical **lowercase**; pragmatic format check |
 | `integer :age` | `Integer` | permissive accepts integer strings and whole Floats |
 | `ip_address :client_ip` | `String` | IPv4/IPv6; canonicalized via IPAddr |
@@ -33,9 +34,13 @@ Inside a schema, permissive parsing collects a structured error instead of retur
 | `money :salary` | `Money` (gem) | amount + currency composite; needs `money` |
 | `object :address, Address` | schema instance | nested schema |
 | `percentage :discount` | `BigDecimal` | `Decimal`, default `scale: 2` |
+| `phone :mobile` | `String` | NANP; canonical E.164 (`+15551234567`); `country_code:` configurable |
+| `routing_number :aba` | `String` | US ABA; 9 digits, **checksum-validated** |
+| `ssn :taxpayer_id` | `String` | US SSN; canonical `AAA-GG-SSSS`; rejects invalid ranges |
 | `string :name` | `String` | permissive also coerces Symbol/Numeric via `to_s` |
 | `url :website` | `String` | absolute http(s); lowercases scheme + host |
 | `uuid :id` | `String` | canonical **lowercase** RFC 4122 (`550E8400-…` → `550e8400-…`) |
+| `zip_code :postal` | `String` | US ZIP / ZIP+4; canonical `12345` or `12345-6789` |
 
 ## Canonicalization
 

@@ -6,6 +6,11 @@ require_relative "types/uuid"
 require_relative "types/email"
 require_relative "types/url"
 require_relative "types/ip_address"
+require_relative "types/phone"
+require_relative "types/zip_code"
+require_relative "types/ssn"
+require_relative "types/ein"
+require_relative "types/routing_number"
 require_relative "types/iso_currency"
 require_relative "types/boolean"
 require_relative "types/integer"
@@ -23,6 +28,11 @@ module Accord
     register :email, Email
     register :url, URL
     register :ip_address, IPAddress
+    register :phone, Phone
+    register :zip_code, ZipCode
+    register :ssn, SSN
+    register :ein, EIN
+    register :routing_number, RoutingNumber
     register :iso_currency, ISOCurrency
     register :boolean, Boolean
     register :integer, Integer
