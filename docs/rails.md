@@ -211,7 +211,18 @@ def create = render json: view.dump!(...), status: :created     # `input` resolv
 
 `version:` is a plain label — an Integer, or any value (`"2024-01"`, `"v2"`). On `accepts` it's a keyword; on `returns` it's a reserved key inside the responses hash (statuses are Integers, so it can't collide). Suffix versioned schema classes (`CreateEmployeeV1`, not `V1::CreateEmployee`) — Accord follows the same convention for auto-named anonymous version blocks (`accepts version: 2 do … end` → `CreateV2Input`), and cross-checks a `V<n>`-suffixed name against the declared `version:` at load. An **unversioned** `returns` is shared into every version (handy for a common `422 => :errors`); an unversioned `accepts` alongside versioned ones is ambiguous and rejected.
 
-**Resolving a request's version.** One method decides it — `accord_api_version` — in order: (1) `Accord.config.version_resolver`, a `->(controller) { … }` proc (plug in a version-lookup library, parse an `Accept` header, read a URL segment/subdomain, look up a per-account pin — anything); (2) otherwise the request header `Accord.config.version_header` (default `"X-API-Version"`); (3) otherwise unversioned. The reader parses the contract whose `version:` matches (by string), falling back to the unversioned one. Override `accord_api_version` in a controller for one-off logic.
+**Accord does not detect versions — it delegates.** Version negotiation (headers, URL segments, `Accept` media types, deprecation windows) is your API versioning library's job; Accord only maps the version *it already resolved* to a `version:` contract. Give it one hook — `Accord.config.version_resolver`, a `->(controller) { … }` returning the request's version — pointed at your library's source of truth:
+
+```ruby
+Accord.configure do |c|
+  c.version_resolver = ->(ctrl) { ctrl.request.version }              # versionist
+  # c.version_resolver = ->(ctrl) { ctrl.params[:version] }           # URL segment (/v2/…)
+  # c.version_resolver = ->(ctrl) { RequestStore.store[:api_version] } # middleware / thread-local
+  # c.version_resolver = ->(ctrl) { ctrl.request.headers["Accept"][/vnd\.myapp\.v(\d+)/, 1] }  # media type
+end
+```
+
+The reader parses the contract whose `version:` matches the resolved value (compared as strings), falling back to the unversioned one. With versioned contracts declared but **no resolver set, Accord raises** rather than silently serving the wrong schema. Inside an action, branch on your *versioning library's* accessor (e.g. `request.version`) — the same source the resolver reads — not on Accord internals.
 
 Each version projects to its **own** OpenAPI document — `Accord::ControllerHelpers.openapi_document(info:, version: 2)` — since a header can't vary a request body within one operation; unversioned endpoints are included in every version's doc.
 

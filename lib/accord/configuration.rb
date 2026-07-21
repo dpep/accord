@@ -12,7 +12,7 @@ module Accord
   # the trusted-internal-caller mode.
   class Configuration
     attr_accessor :strict, :default_currency, :notifications, :observe_coercions, :input_reader,
-                  :default_phone_country_code, :version_header, :version_resolver
+                  :default_phone_country_code, :version_resolver
 
     def initialize
       @strict = false
@@ -21,8 +21,10 @@ module Accord
       @observe_coercions = false # emit accord.parse.coerced (permissive -> strict signal)
       @input_reader = :input   # default reader name for `accepts` (override per-action with `as:`)
       @default_phone_country_code = "1" # NANP (US/Canada); the `phone` type's default calling code
-      @version_header = "X-API-Version" # request header read to resolve a request's API version
-      @version_resolver = nil  # override: a `->(controller) { ... }` (e.g. a version-lookup library)
+      # Delegate API-version detection to your versioning library: a
+      # `->(controller) { ... }` returning the request's version. Accord matches
+      # that label to a versioned `accepts`/`returns`; it does not detect versions.
+      @version_resolver = nil
     end
   end
 end

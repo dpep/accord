@@ -355,8 +355,16 @@ module Accord
     # input.
     def accord_action_input
       action = action_name.to_sym
-      version = accord_api_version
       candidates = self.class.accord_endpoints.select { |e| e.action == action && e.accepts? }
+
+      if candidates.any?(&:version) && Accord.config.version_resolver.nil?
+        raise ArgumentError,
+              "#{self.class}##{action} declares versioned `accepts` contracts but Accord.config.version_resolver " \
+              "is unset — set it to delegate to your API versioning library, e.g. " \
+              "`->(controller) { controller.request.version }`"
+      end
+
+      version = accord_api_version
       endpoint = candidates.find { |e| e.version.to_s == version.to_s } || candidates.find { |e| e.version.nil? }
       raise ArgumentError, "no accord `accepts` contract for #{action_name} (version #{version.inspect})" unless endpoint
 
@@ -366,15 +374,12 @@ module Accord
       )
     end
 
-    # The request's API version: the configured resolver proc, else the version
-    # header (`Accord.config.version_header`). Override per-controller if neither
-    # fits. nil for an unversioned request.
+    # The request's API version, delegated entirely to your versioning library
+    # via `Accord.config.version_resolver` (a `->(controller) { ... }`). Accord
+    # does not detect versions itself — nil (unversioned) when no resolver is set.
     def accord_api_version
       resolver = Accord.config.version_resolver
-      return resolver.call(self) if resolver
-      return request.headers[Accord.config.version_header] if respond_to?(:request) && request
-
-      nil
+      resolver ? resolver.call(self) : nil
     end
 
     # Override in a controller to customize the 422 response.

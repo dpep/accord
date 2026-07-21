@@ -103,11 +103,11 @@ class OrdersController < ApplicationController
   returns 422 => :errors                 # unversioned -> shared by every version
   def create
     # `input` is the schema matching the request's version (a CreateOrderV1 or
-    # CreateOrderV2); `accord_api_version` is the resolved label. Branch on it to
-    # handle the shapes that diverge.
+    # CreateOrderV2). Branch on YOUR versioning library's accessor — here
+    # `request.version` (versionist) — the same source Accord's resolver reads.
     order = Order.new(product_id: input.product_id, quantity: input.quantity)
 
-    if accord_api_version.to_s == "2" && input.coupon    # `coupon` exists only on the v2 schema
+    if request.version.to_s == "2" && input.coupon      # `coupon` exists only on the v2 schema
       order.discount = Coupon.redeem(input.coupon)       # newer behavior, v2 clients only
     end
 
@@ -116,16 +116,20 @@ class OrdersController < ApplicationController
   end
 end
 
-# Resolving a request's version (in order): a configured resolver proc, else a
-# request header, else unversioned. Configure once, in an initializer:
+# Accord does NOT detect versions — it delegates to whatever versioning library
+# you already run, then matches the version it returns to a `version:` contract.
+# Point the resolver at your library's source of truth, once, in an initializer:
 #
 #   Accord.configure do |c|
-#     c.version_header   = "X-API-Version"          # the default
-#     c.version_resolver = ->(controller) { ... }   # override: e.g. a version-lookup library,
-#   end                                             #   an Accept header, or a URL/subdomain segment
+#     c.version_resolver = ->(ctrl) { ctrl.request.version }        # versionist
+#     # c.version_resolver = ->(ctrl) { ctrl.params[:version] }     # URL segment (/v2/…)
+#     # c.version_resolver = ->(ctrl) { RequestStore.store[:api_version] }  # middleware/thread-local
+#   end
 #
-# Each version projects to its OWN OpenAPI document (a header can't vary a body
-# in a single operation): `openapi_document(info:, version: 2)`.
+# With versioned contracts declared but no resolver set, Accord raises (rather
+# than silently serving the wrong schema). Each version projects to its OWN
+# OpenAPI document (a header can't vary a body in one operation):
+# `openapi_document(info:, version: 2)`.
 
 # --- The `accord` macro: typed input, no documented contract -----------------
 #

@@ -172,16 +172,16 @@ describe "accepts / returns contract DSL" do
 
   describe "single-controller versioning" do
     before do
-      stub_const("V1Create", Class.new(Accord::Schema) { string :name, :required })
-      stub_const("V2Create", Class.new(Accord::Schema) do
+      stub_const("CreateV1", Class.new(Accord::Schema) { string :name, :required })
+      stub_const("CreateV2", Class.new(Accord::Schema) do
         string :name, :required
         string :email
       end)
     end
 
     def versioned_controller
-      v1 = V1Create
-      v2 = V2Create
+      v1 = CreateV1
+      v2 = CreateV2
       controller_class do
         accepts v1, version: 1
         accepts v2, version: 2
@@ -200,7 +200,7 @@ describe "accepts / returns contract DSL" do
       instance = controller.new({ name: "Ada", email: "a@x.co" })
       instance.action_name = "create"
 
-      expect(instance.input).to be_a(V2Create)
+      expect(instance.input).to be_a(CreateV2)
       expect(instance.input.email).to eq("a@x.co")
     ensure
       Accord.config.version_resolver = nil
@@ -211,7 +211,7 @@ describe "accepts / returns contract DSL" do
       Accord.config.version_resolver = ->(_) { 1 }
       instance = controller.new({ name: "Ada" }).tap { |c| c.action_name = "create" }
 
-      expect(instance.input).to be_a(V1Create)
+      expect(instance.input).to be_a(CreateV1)
     ensure
       Accord.config.version_resolver = nil
     end
@@ -224,13 +224,13 @@ describe "accepts / returns contract DSL" do
 
       v2 = Accord::ControllerHelpers.openapi_document(info: { title: "API", version: "2" }, version: 2, endpoints:, resolver:)
 
-      expect(v2[:components][:schemas].keys).to include("V2Create")
-      expect(v2[:components][:schemas].keys).not_to include("V1Create")
+      expect(v2[:components][:schemas].keys).to include("CreateV2")
+      expect(v2[:components][:schemas].keys).not_to include("CreateV1")
     end
 
     it "shares an unversioned returns across every version" do
-      v1 = V1Create
-      v2 = V2Create
+      v1 = CreateV1
+      v2 = CreateV2
       controller = controller_class do
         returns 422 => :errors                # shared across versions
         accepts v1, version: 1
@@ -246,11 +246,11 @@ describe "accepts / returns contract DSL" do
     end
 
     it "rejects an unversioned accepts mixed with versioned ones" do
-      v1 = V1Create
+      v1 = CreateV1
       expect do
         controller_class do
           accepts v1                          # unversioned
-          accepts V2Create, version: 2
+          accepts CreateV2, version: 2
           def create = input
         end
       end.to raise_error(ArgumentError, /can't mix/)
@@ -268,15 +268,26 @@ describe "accepts / returns contract DSL" do
 
     it "accepts a non-integer version label (e.g. a date)" do
       controller = controller_class do
-        accepts V1Create, version: "2024-01"
+        accepts CreateV1, version: "2024-01"
         def create = input
       end
       Accord.config.version_resolver = ->(_) { "2024-01" }
       instance = controller.new({ name: "Ada" }).tap { |c| c.action_name = "create" }
 
-      expect(instance.input).to be_a(V1Create)
+      expect(instance.input).to be_a(CreateV1)
     ensure
       Accord.config.version_resolver = nil
+    end
+
+    it "fails fast when versioned contracts have no configured resolver" do
+      controller = controller_class do
+        accepts CreateV1, version: 1
+        accepts CreateV2, version: 2
+        def create = input
+      end
+      instance = controller.new({ name: "Ada" }).tap { |c| c.action_name = "create" }
+
+      expect { instance.input }.to raise_error(ArgumentError, /version_resolver/)
     end
 
     it "auto-names an anonymous versioned block schema with the version suffix" do
