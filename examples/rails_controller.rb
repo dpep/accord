@@ -1,11 +1,8 @@
 # frozen_string_literal: true
 
-# Illustrative Rails setup — copy the pieces into a real app (this file needs
-# Rails to run). It leads with the `accepts`/`returns` contract DSL (the
-# recommended default: a documented request + response contract declared right
-# on the action, and the source for OpenAPI generation), then shows the lighter
-# `accord` macro for when you only want typed input. See docs/rails.md for the
-# narrated version.
+# Illustrative Rails setup — copy the pieces into a real app (needs Rails to
+# run). It leads with the recommended `accepts`/`returns` contract DSL, then
+# shows the lighter `accord` macro. See docs/rails.md for the narrated version.
 
 # --- Gemfile -----------------------------------------------------------------
 #
@@ -27,11 +24,9 @@ end
 
 # --- The contract DSL: accepts / returns (recommended) -----------------------
 #
-# The recommended path for new controllers. `accepts`/`returns` declare a
-# per-action contract right on the action: the action gets a typed reader
-# (`input` by default), invalid input is rendered as a 422 automatically (the
-# body never runs), and every contract feeds OpenAPI path generation. Start
-# simple; layer on options only as you need them.
+# The recommended path. `accepts`/`returns` declare a per-action contract: a
+# typed reader (`input` by default), an automatic 422 on bad input (the body
+# never runs), and OpenAPI path generation. Start simple, add options as needed.
 
 # (1) Simplest: an anonymous input schema. No separate class — it's named from
 # the action (`SearchController::IndexInput`), so it still projects to OpenAPI.
@@ -83,9 +78,8 @@ class EmployeesController < ApplicationController
 end
 
 # (3) Versioning: one controller, several API versions. Label each contract with
-# `version:` — the reader parses the one matching the request. Suffix the schema
-# classes (CreateOrderV2, not V2::CreateOrder); Accord follows the same
-# convention for auto-named anonymous version blocks (`CreateV2Input`).
+# `version:`; the reader parses the one matching the request. Suffix the schema
+# classes (CreateOrderV2, not V2::CreateOrder).
 class CreateOrderV1 < Accord::Schema
   uuid    :product_id, :required
   integer :quantity,   :required
@@ -115,27 +109,23 @@ class OrdersController < ApplicationController
   end
 end
 
-# Accord does NOT detect versions — it delegates to whatever versioning library
-# you already run, then matches the version it returns to a `version:` contract.
-# Point the resolver at your library's source of truth, once, in an initializer:
+# Accord does NOT detect versions — it delegates. Point the resolver at your
+# versioning library's source of truth, once, in an initializer:
 #
 #   Accord.configure do |c|
 #     c.version_resolver = ->(ctrl) { ctrl.request.version }        # versionist
 #     # c.version_resolver = ->(ctrl) { ctrl.params[:version] }     # URL segment (/v2/…)
-#     # c.version_resolver = ->(ctrl) { RequestStore.store[:api_version] }  # middleware/thread-local
+#     # c.version_resolver = ->(ctrl) { RequestStore.store[:api_version] }  # thread-local
 #   end
 #
-# With versioned contracts declared but no resolver set, Accord raises (rather
-# than silently serving the wrong schema). Each version projects to its OWN
-# OpenAPI document (a header can't vary a body in one operation):
-# `openapi_document(info:, version: 2)`.
+# No resolver + versioned contracts -> Accord raises (never the wrong schema).
+# Each version gets its own OpenAPI doc: openapi_document(version: 2).
 
 # --- The `accord` macro (lighter alternative) --------------------------------
 #
-# Prefer accepts/returns (above) for new code — it gives the same typed reader
-# plus a documented contract and OpenAPI. `accord` is the lighter option when you
-# want ONLY typed input and no contract; kept for now, its role to be revisited
-# after more real-world use. Same schemas, three source styles:
+# Prefer accepts/returns for new code — same typed reader, plus a contract and
+# OpenAPI. Use `accord` when you want only typed input, no contract. Kept for
+# now; we'll revisit it later. Same schemas, three source styles:
 
 class LegacyEmployeesController < ApplicationController
   accord :employee, CreateEmployee                        # (1) default — reads `params`
