@@ -25,12 +25,13 @@ class ApplicationController < ActionController::API
   end
 end
 
-# --- The contract DSL: accepts / returns -------------------------------------
+# --- The contract DSL: accepts / returns (recommended) -----------------------
 #
-# `accepts`/`returns` declare a per-action contract right on the action: the
-# action gets a typed reader (`input` by default), invalid input is rendered as
-# a 422 automatically (the body never runs), and every contract feeds OpenAPI
-# path generation. Start simple; layer on options only as you need them.
+# The recommended path for new controllers. `accepts`/`returns` declare a
+# per-action contract right on the action: the action gets a typed reader
+# (`input` by default), invalid input is rendered as a 422 automatically (the
+# body never runs), and every contract feeds OpenAPI path generation. Start
+# simple; layer on options only as you need them.
 
 # (1) Simplest: an anonymous input schema. No separate class — it's named from
 # the action (`SearchController::IndexInput`), so it still projects to OpenAPI.
@@ -129,11 +130,12 @@ end
 # OpenAPI document (a header can't vary a body in one operation):
 # `openapi_document(info:, version: 2)`.
 
-# --- The `accord` macro: typed input, no documented contract -----------------
+# --- The `accord` macro (lighter alternative) --------------------------------
 #
-# Lighter alternative to `accepts` — named readers without a response contract
-# or an OpenAPI path. Reach for it when you only want typed input. Same schemas,
-# three source styles:
+# Prefer accepts/returns (above) for new code — it gives the same typed reader
+# plus a documented contract and OpenAPI. `accord` is the lighter option when you
+# want ONLY typed input and no contract; kept for now, its role to be revisited
+# after more real-world use. Same schemas, three source styles:
 
 class LegacyEmployeesController < ApplicationController
   accord :employee, CreateEmployee                        # (1) default — reads `params`
