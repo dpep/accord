@@ -55,9 +55,8 @@ class CreateEmployee < Accord::Schema
   string   :role, default: "member"      # default: absent input -> "member"
   date     :hired_on
 
-  string :email, :required do            # block form: several rules on one field
-    format(/\A[^@\s]+@[^@\s]+\z/)
-    length 5..255
+  email :email, :required do             # `email` type validates + canonicalizes; add rules on top
+    format(/@gmail\.com\z/i)             # this example accepts only gmail addresses
   end
 end
 
@@ -70,7 +69,7 @@ end
 
 class EmployeesController < ApplicationController
   accepts CreateEmployee, as: :employee                 # `as:` names the reader (Sorbet-typed)
-  returns 201 => EmployeeView, 422 => :errors           # status => contract; :errors is the shared response
+  returns 201 => EmployeeView                           # 422 => :errors is derived from `accepts`, not declared
   def create
     record = Employee.create!(employee.to_h)            # typed input -> a record
     render json: EmployeeView.parse!(record.attributes).dump, status: :created  # project it back out (canonical)
@@ -99,8 +98,7 @@ end
 
 class OrdersController < ApplicationController
   accepts CreateOrderV1, version: 1
-  accepts CreateOrderV2, version: 2
-  returns 422 => :errors                 # unversioned -> shared by every version
+  accepts CreateOrderV2, version: 2      # 422 is derived per version from each `accepts`
   def create
     # `input` is the schema matching the request's version (a CreateOrderV1 or
     # CreateOrderV2). Branch on YOUR versioning library's accessor — here
@@ -166,8 +164,8 @@ end
 #
 # `doc` has full `paths` (verb + path from your routes), `components.schemas`
 # (CreateEmployee, EmployeeView, ...), and a shared `components.responses`
-# AccordErrors for every `422 => :errors`. For a versioned API, pass `version:`
-# to scope the document to one version.
+# AccordErrors referenced by the derived 422 on every `accepts` action. For a
+# versioned API, pass `version:` to scope the document to one version.
 
 # --- Notes -------------------------------------------------------------------
 #

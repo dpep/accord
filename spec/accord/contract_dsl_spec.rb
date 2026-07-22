@@ -119,7 +119,7 @@ describe "accepts / returns contract DSL" do
     stub_const("EmployeeView", Class.new(Accord::Schema) { string :name })
     controller = controller_class do
       accepts CreateEmployee
-      returns 201 => EmployeeView, 422 => :errors
+      returns 201 => EmployeeView          # 422 => :errors is derived from `accepts`, not declared
       def create = input
     end
     stub_const("EmployeesController", controller)
@@ -136,8 +136,29 @@ describe "accepts / returns contract DSL" do
     post = parsed.paths["/employees"].post
     expect(post.request_body.content["application/json"].schema.properties.keys).to include("name")
     expect(post.responses["201"].content["application/json"].schema.properties.keys).to include("name")
-    expect(post.responses["422"]).not_to be_nil                                   # $ref AccordErrors, resolved
+    expect(post.responses["422"]).not_to be_nil                                   # auto-injected AccordErrors
     expect(parsed.components.schemas.keys).to include("CreateEmployee", "EmployeeView")
+  end
+
+  it "does not inject a 422 for an output-only action (no accepts)" do
+    require "openapi3_parser"
+    require "json"
+    stub_const("EmployeeView", Class.new(Accord::Schema) { string :name })
+    controller = controller_class do
+      returns 200 => [EmployeeView]
+      def index; end
+    end
+    stub_const("EmployeesController", controller)
+
+    doc = Accord::ControllerHelpers.openapi_document(
+      info: { title: "API", version: "1" },
+      endpoints: Accord::ControllerHelpers.endpoints([controller]),
+      resolver: ->(_c, _a) { ["GET", "/employees"] },
+    )
+    parsed = Openapi3Parser.load(JSON.parse(JSON.generate(doc)))
+
+    expect(parsed.errors.to_a).to be_empty
+    expect(parsed.paths["/employees"].get.responses["422"]).to be_nil   # no request body -> no derived 422
   end
 
   it "gives responses reason-phrase descriptions and handles lists + no-content" do

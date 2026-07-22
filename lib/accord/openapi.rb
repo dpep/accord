@@ -42,16 +42,21 @@ module Accord
     end
 
     def responses(endpoint)
-      return { "200" => { description: "OK" } } unless endpoint.returns?
-
-      endpoint.returns.each_with_object({}) do |(status, contract), out|
-        out[status.to_s] =
+      out = endpoint.returns.each_with_object({}) do |(status, contract), acc|
+        acc[status.to_s] =
           case contract
           when :errors then ERRORS_REF
           when nil then { description: status_text(status) }                                # e.g. 204, no body
           else { description: status_text(status), content: json(schema_ref(contract)) }
           end
       end
+
+      # A request contract can always fail validation -> 422; derive it so every
+      # `accepts` endpoint documents it without repeating `returns 422 => :errors`.
+      out["422"] ||= ERRORS_REF if endpoint.accepts?
+      # Never emit an empty responses object — default to 200 if no success is declared.
+      out["200"] ||= { description: "OK" } unless out.keys.any? { |s| s.start_with?("2") }
+      out
     end
 
     def status_text(status)
@@ -63,6 +68,7 @@ module Accord
       uses_errors = false
       endpoints.each do |endpoint|
         collect(endpoint.accepts, schemas) if endpoint.accepts?
+        uses_errors = true if endpoint.accepts?   # the derived 422 references AccordErrors
         endpoint.returns.each_value do |contract|
           next if contract.nil?
 

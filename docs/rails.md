@@ -42,8 +42,8 @@ Define schemas wherever you like — a common home is `app/schemas`:
 # app/schemas/create_employee.rb
 class CreateEmployee < Accord::Schema
   string   :name, :required
-  string   :email, :required do
-    format(/\A[^@\s]+@[^@\s]+\z/)
+  email    :email, :required do
+    format(/@gmail\.com\z/i)   # `email` validates + canonicalizes; this example accepts only gmail
   end
   currency :salary, :positive
   boolean  :active, default: true
@@ -80,13 +80,13 @@ employee.to_h      # => { name: "Ada", email: "...", salary: ..., active: true, 
 
 `to_h` is a deep Hash of **typed** values (nested schemas recurse to Hashes too) — hand it to `Model.new`/`create!`. To **serialize** (render JSON), use `dump`, which emits the canonical *external* form — strings like `"65000.00"` and `"2026-01-15"`: `render json: employee.dump`.
 
-If the request is invalid, calling `employee` raises `Accord::InvalidInput`, which a `rescue_from` (installed when the concern is included) turns into a `422` with the structured errors — your action body never runs. A request like `POST /employees` with `{ "salary": "-5", "email": "nope" }` yields:
+If the request is invalid, calling `employee` raises `Accord::InvalidInput`, which a `rescue_from` (installed when the concern is included) turns into a `422` with the structured errors — your action body never runs. A request like `POST /employees` with `{ "salary": "-5", "email": "ada@yahoo.com" }` yields:
 
 ```json
 {
   "errors": [
     { "path": ["name"],   "field": "name",   "code": "required" },
-    { "path": ["email"],  "field": "email",  "code": "invalid_format", "validator": "format", "value": "nope", "pattern": "\\A[^@\\s]+@[^@\\s]+\\z" },
+    { "path": ["email"],  "field": "email",  "code": "invalid_format", "validator": "format", "value": "ada@yahoo.com", "pattern": "@gmail\\.com\\z" },
     { "path": ["salary"], "field": "salary", "code": "not_positive",   "validator": "positive", "value": "-5.00" }
   ]
 }
@@ -103,7 +103,7 @@ Note that **every** error is reported, not just the first — Accord parses the 
 ```ruby
 class EmployeesController < ApplicationController
   accepts CreateEmployee, as: :employee
-  returns 201 => EmployeeView, 422 => :errors
+  returns 201 => EmployeeView          # 422 is automatic — any `accepts` action can fail validation
   def create
     record = Employee.create!(employee.to_h)
     render json: EmployeeView.parse!(record.attributes).dump, status: :created
@@ -176,7 +176,7 @@ Accord distinguishes an **absent** field from one sent as **explicit null**, whi
 
 ```ruby
 accepts CreateEmployee, as: :employee
-returns 204 => nil, 422 => :errors
+returns 204 => nil
 def update
   # PATCH /employees/1  { "email": null }   -> clears email, leaves everything else alone
   Employee.find(params[:id]).update!(employee.to_h(compact: true))
@@ -192,8 +192,10 @@ Use `input.present?(:field)` to test whether a key was supplied. (Plain `to_h` i
 
 - a **`Schema`** — the response body, used in the dump direction (`201 => EmployeeView`)
 - a **`[Schema]`** list — a JSON array of that schema (`200 => [EmployeeView]`)
-- **`:errors`** — the shared structured-error response (`422 => :errors`), the same shape [`render_accord_errors`](#rendering-errors) emits
+- **`:errors`** — the shared structured-error response, the same shape [`render_accord_errors`](#rendering-errors) emits
 - **`nil`** — no body (`204 => nil`)
+
+**You don't declare `422 => :errors`.** Any action with an `accepts` contract can fail validation, so Accord derives the `422 => :errors` response for it automatically — it's implied by the request contract, not repeated on every `returns`. (Declaring it explicitly is harmless but redundant. An output-only action, with no `accepts`, gets no derived 422.) The `:errors` symbol is still there for the rare case you want that response on an action without an `accepts`.
 
 Responses are ordinary `Accord::Schema`s used in the dump direction — no separate serializer concept. There's no `Schema.dump!` class method: to project a record through a response schema, coerce it to canonical external form with `EmployeeView.parse!(record.attributes).dump` — parse the record's attributes into a typed instance, then `#dump` it. For a one-off response shape easier to declare inline than to name, `returns` also takes a block form — an anonymous response schema, named from the action like an inline `accepts`: `returns(201) { string :location }`.
 
@@ -209,7 +211,7 @@ doc = Accord::ControllerHelpers.openapi_document(info: { title: "API", version: 
 File.write("openapi.json", JSON.pretty_generate(doc))
 ```
 
-`doc` has full `paths` (verb + path pulled from your routes), `components.schemas` (`CreateEmployee`, `EmployeeView`, …), and a shared `components.responses` `AccordErrors` referenced by every `422 => :errors`. `openapi_document` accepts `info:`, `version:` (scope to one API version), `endpoints:` (a specific set instead of the whole app), and `resolver:` (override version resolution). See [openapi.md](openapi.md).
+`doc` has full `paths` (verb + path pulled from your routes), `components.schemas` (`CreateEmployee`, `EmployeeView`, …), and a shared `components.responses` `AccordErrors` referenced by the derived `422` on every `accepts` action. `openapi_document` accepts `info:`, `version:` (scope to one API version), `endpoints:` (a specific set instead of the whole app), and `resolver:` (override version resolution). See [openapi.md](openapi.md).
 
 ### Introspection
 
@@ -230,15 +232,13 @@ returns 201 => EmployeeViewV1, version: 1
 
 accepts CreateEmployeeV2, version: 2
 returns 201 => EmployeeViewV2, 202 => AsyncReceipt, version: 2
-
-returns 422 => :errors                              # unversioned → shared by every version
 def create
   record = Employee.create!(input.to_h)             # `input` resolves the request's version
   render json: record, status: :created
 end
 ```
 
-`version:` is a plain label — an Integer, or any value (`"2024-01"`, `"v2"`); Accord is unopinionated about its shape. Labels are matched exactly, as strings (`label.to_s == resolved.to_s`), so `1` matches `"1"` but `"V2"` won't match `"v2"` and `" 2"` won't match `"2"` — pick one canonical spelling and have your resolver emit it. On `accepts` `version:` is a keyword; on `returns` it's a reserved key inside the responses hash (statuses are Integers, so it can't collide). Suffix versioned schema classes (`CreateEmployeeV1`, not `V1::CreateEmployee`) — Accord follows the same convention for auto-named anonymous version blocks (`accepts version: 2 do … end` → `CreateV2Input`). An **unversioned** `returns` is shared into every version (handy for a common `422 => :errors`); an unversioned `accepts` alongside versioned ones is ambiguous and rejected.
+`version:` is a plain label — an Integer, or any value (`"2024-01"`, `"v2"`); Accord is unopinionated about its shape. Labels are matched exactly, as strings (`label.to_s == resolved.to_s`), so `1` matches `"1"` but `"V2"` won't match `"v2"` and `" 2"` won't match `"2"` — pick one canonical spelling and have your resolver emit it. On `accepts` `version:` is a keyword; on `returns` it's a reserved key inside the responses hash (statuses are Integers, so it can't collide). Suffix versioned schema classes (`CreateEmployeeV1`, not `V1::CreateEmployee`) — Accord follows the same convention for auto-named anonymous version blocks (`accepts version: 2 do … end` → `CreateV2Input`). An **unversioned** `returns` is shared into every version (handy for a response common to all versions); an unversioned `accepts` alongside versioned ones is ambiguous and rejected. (The `422` is derived per version from each `accepts`, so you never repeat it.)
 
 **Accord does not detect versions — it delegates.** Version negotiation (headers, URL segments, `Accept` media types, deprecation windows) is your API versioning library's job; Accord only maps the version *it already resolved* to a `version:` contract. Give it one hook — `Accord.config.version_resolver`, a `->(controller) { … }` returning the request's version — pointed at your library's source of truth:
 
