@@ -38,6 +38,18 @@ describe Accord::Schema do
       expect(input.salary).to be_nil
     end
 
+    it "drops undeclared keys instead of choking on them (the schema is the allowlist)" do
+      extra = { name: "Ada", admin: true, injected: "x", nested: { a: 1 } }
+
+      permissive = schema.parse(extra)
+      strict = schema.parse!(extra)   # even strict must not raise on extras
+
+      expect(permissive).to be_valid
+      expect(permissive.to_h.keys).to contain_exactly(:name, :active, :salary)  # only declared fields
+      expect(strict.to_h).not_to include(:admin, :injected, :nested)            # extras dropped
+      expect(strict.dump.keys).to contain_exactly(:name, :active, :salary)      # out path filters too
+    end
+
     it "tolerates nil input" do
       expect(schema.parse(nil)).not_to be_valid
     end
