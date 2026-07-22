@@ -18,7 +18,6 @@ end
 
 class EmployeesController < ApplicationController
   accepts CreateEmployee, as: :employee   # a typed request contract; 422 if invalid
-
   def create
     EmployeeService.call(employee)         # parsed + memoized on first use
     head :created
