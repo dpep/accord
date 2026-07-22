@@ -5,7 +5,15 @@ Accord's sweet spot is the controller boundary: turn untrusted `params` into a *
 - [Setup](#setup)
 - [Your first controller](#your-first-controller)
 - [The contract DSL: `accepts` / `returns`](#the-contract-dsl-accepts--returns)
-- [Versioning](#versioning)
+  - [The typed reader](#the-typed-reader)
+  - [Scoping input: `from:` and `strict:`](#scoping-input-from-and-strict)
+  - [Inline schemas](#inline-schemas)
+  - [List inputs](#list-inputs)
+  - [Partial updates (PATCH)](#partial-updates-patch)
+  - [The response contract: `returns`](#the-response-contract-returns)
+  - [OpenAPI generation](#openapi-generation)
+  - [Introspection](#introspection)
+  - [Versioning](#versioning)
 - [The `accord` macro (lighter alternative)](#the-accord-macro-lighter-alternative)
 - [Calling a schema directly](#calling-a-schema-directly)
 - [Rendering errors](#rendering-errors)
@@ -13,6 +21,7 @@ Accord's sweet spot is the controller boundary: turn untrusted `params` into a *
 - [Strong Parameters](#strong-parameters)
 - [Strict mode](#strict-mode)
 - [Observability](#observability)
+- [From permissive to strict](#from-permissive-to-strict)
 - [Testing controllers](#testing-controllers)
 
 ---
@@ -71,20 +80,6 @@ employee.to_h      # => { name: "Ada", email: "...", salary: ..., active: true, 
 
 `to_h` is a deep Hash of **typed** values (nested schemas recurse to Hashes too) — hand it to `Model.new`/`create!`. To **serialize** (render JSON), use `dump`, which emits the canonical *external* form — strings like `"65000.00"` and `"2026-01-15"`: `render json: employee.dump`.
 
-### Partial updates (PATCH)
-
-Accord distinguishes an **absent** field from one sent as **explicit null**, which is exactly the PATCH contract — an absent field is left untouched, a null clears it. An explicit null yields `nil` (skipping any default); `to_h(compact: true)` returns only the fields the request actually carried a key for (keeping nulls, dropping absent):
-
-```ruby
-def update
-  # PATCH /employees/1  { "email": null }   -> clears email, leaves everything else alone
-  Employee.find(params[:id]).update!(employee.to_h(compact: true))
-  head :no_content
-end
-```
-
-Use `input.present?(:field)` to test whether a key was supplied. (Plain `to_h` is the create shape — every field, defaults applied.)
-
 If the request is invalid, calling `employee` raises `Accord::InvalidInput`, which a `rescue_from` (installed when the concern is included) turns into a `422` with the structured errors — your action body never runs. A request like `POST /employees` with `{ "salary": "-5", "email": "nope" }` yields:
 
 ```json
@@ -101,102 +96,129 @@ Note that **every** error is reported, not just the first — Accord parses the 
 
 ---
 
-## The `accord` macro (lighter alternative)
-
-> Prefer [`accepts`/`returns`](#the-contract-dsl-accepts--returns) for new code — it gives the same typed reader plus a documented contract and OpenAPI. `accord` is the lighter option when you want *only* typed input and no contract; we're keeping it for now and will revisit its role after more real-world use.
-
-```ruby
-accord :employee, CreateEmployee
-accord :filters,  EmployeeFilters, from: -> { params[:q] }
-```
-
-`accord :name, Schema` defines a **lazily-parsed, memoized reader** named `name`. It's not an action hook — it's just a reader — so a controller can declare several inputs and each action uses whichever it needs:
-
-```ruby
-class EmployeesController < ApplicationController
-  accord :employee, CreateEmployee
-  accord :filters,  EmployeeFilters, from: -> { params.fetch(:q, {}) }
-
-  def index
-    render json: Employee.where(filters.to_h)   # uses `filters`
-  end
-
-  def create
-    render json: Employee.create!(employee.to_h), status: :created  # uses `employee`
-  end
-end
-```
-
-- **Lazy** — the schema parses on first access, so declaring an input costs nothing in actions that don't use it.
-- **Memoized** — accessing `employee` twice parses once.
-- **`from:`** — scopes the source (defaults to all of `params`). A **Symbol** names a params key (`from: :q` → `params[:q]`) for the common nested case; a **proc**, evaluated in controller context, handles anything a single key can't (`from: -> { params.dig(:data, :attributes) }`).
-- **`strict:`** — `accord :employee, CreateEmployee, strict: true` rejects loose input at this endpoint (overrides `Accord.config.strict`); a bad or missing value renders a `422` like any other client data.
-- **Typed** — with Sorbet, the bundled Tapioca DSL compiler types each reader from its schema (`employee` → `CreateEmployee`, a `[Schema]` list → `T::Array[CreateEmployee]`), so `employee.salary` type-checks inside the action. Run `bundle exec tapioca dsl`.
-- **Introspectable** — the declarations live in `Controller.accord_inputs` (`{ reader_name => schema }`), e.g. to enumerate every controller's inputs for docs or an OpenAPI paths generator.
-
-### Inline schemas
-
-Pass a block instead of a schema class to define a schema right in the controller — handy for a simple, single-use input that doesn't warrant its own file:
-
-```ruby
-accord :search, from: :q do
-  string  :name
-  boolean :active
-end
-```
-
-The inline schema is named as a controller constant (`:search` → `SearchController::SearchInput`), so it still projects to OpenAPI/RBS/RBI. Pass `const:` to choose the name (`accord :search, const: :SearchParams do … end`); accord refuses to clobber an existing constant that isn't itself a schema. Reach for a top-level named class when you want reuse across controllers or isolated schema tests. `accord` requires exactly one of a schema class or a block.
-
-### List inputs
-
-Wrap the schema in a one-element array to parse a **list** — the reader returns the parsed inputs, and errors carry each element's index (`[2, :salary]`, no wrapper key):
-
-```ruby
-accord :batch, [CreateEmployee], from: :employees   # params[:employees] is an array
-
-def import
-  Employee.insert_all!(batch.map(&:to_h))           # one 422 lists every bad row
-end
-```
-
-Like an inline block, this mints a constant — an `Accord::Schema::List` (`BatchInput`) whose projection methods are array-shaped: `.openapi` → `{ type: array, items: $ref }`, `.rbs` → `Array[CreateEmployee]`, `.graphql` → `[CreateEmployeeInput!]!`. Because it's a list wrapper (not a `Schema` subclass), it isn't a standalone named type — `tapioca dsl` and `accord:rbs` emit the *element* (`CreateEmployee`), and you reference the list type inline. `Accord::Schema::List.new(CreateEmployee)` is usable outside Rails too.
-
-Eager validation (fail before the action body) is just a `before_action`:
-
-```ruby
-before_action :employee, only: :create
-```
-
----
-
 ## The contract DSL: `accepts` / `returns`
 
-Where `accord` gives you *named readers* decoupled from actions, the `accepts`/`returns` decorators declare a **per-action contract** — request schema, response schema(s), all in one place on the action, `sig`-style. They're the source for OpenAPI *path* generation; `accord` is the lighter tool when you just want typed input.
+`accepts` and `returns` declare a **per-action contract** — request schema in, response schema(s) out — right on the action, `sig`-style. It's the recommended default: the same typed reader you just saw, plus a documented contract that drives OpenAPI *path* generation. (The lighter [`accord` macro](#the-accord-macro-lighter-alternative) gives you named readers with no contract when that's all you want.)
 
 ```ruby
 class EmployeesController < ApplicationController
   accepts CreateEmployee, as: :employee
   returns 201 => EmployeeView, 422 => :errors
   def create
-    render json: EmployeeView.dump!(Employee.create!(employee.to_h)), status: :created
+    record = Employee.create!(employee.to_h)
+    render json: EmployeeView.parse!(record.attributes).dump, status: :created
   end
 
-  accepts do                       # anonymous schema, named CreateController::IndexInput
+  accepts do                       # anonymous schema, named EmployeesController::IndexInput
     string  :name
     boolean :active
   end
   returns 200 => [EmployeeView]    # a list response
   def index
-    render json: EmployeeView.dump_all(Employee.where(input.to_h))
+    render json: Employee.where(input.to_h).map { |e| EmployeeView.parse!(e.attributes).dump }
   end
 end
 ```
 
-- Both decorators bind to the **next `def`** and compose; either or both is fine. `accepts` alone is a typed-input endpoint; `returns` alone is an output-only projection.
-- **The reader** is `input` by default (rename per-action with `as:`, or globally with `Accord.config.input_reader`). It's action-dispatched — it parses whatever the current action declared — so it's a single method, not one per action. Because of that, `input` is polymorphic and can't be statically typed; a **`as:`-named** reader (unique per action) can be, so prefer `as:` when you want the Sorbet/RBI reader type.
-- `accepts` carries the same `from:`/`strict:`/`[Schema]`/block options as `accord`; a block schema is named from the action (`create` → `CreateInput`) so it projects.
-- **`returns`** maps `status => contract`, where a contract is a `Schema`, a `[Schema]` list, or a symbol naming a shared response (`:errors`). Responses are ordinary `Accord::Schema`s used in the dump direction — no separate serializer concept.
-- Introspect the whole graph: `Controller.accord_endpoints` (an Array of `Accord::Endpoint`), or `Accord::ControllerHelpers.endpoints` across the app.
+Both decorators bind to the **next `def`** and compose; either or both is fine. `accepts` alone is a typed-input endpoint; `returns` alone is an output-only projection.
+
+### The typed reader
+
+The reader is `input` by default. It's action-dispatched — it parses whatever schema the *current* action declared — so it's a single method shared by every action, not one per action. That polymorphism is also why `input` can't be statically typed.
+
+Two ways to rename it:
+
+- **Per-action with `as:`** — `accepts CreateEmployee, as: :employee` gives that action an `employee` reader. Because an `as:`-named reader is unique to one action, it *can* be statically typed (Sorbet/RBI), so prefer `as:` when you want the typed reader inside the action.
+- **Globally with `Accord.config.input_reader`** — rename the default from `input` to whatever your house style prefers.
+
+The reader is lazy and memoized: the schema parses on first access and only once, so declaring a contract costs nothing in an action that never touches it. Undeclared input keys are silently dropped — in permissive and strict mode alike, never an error (the schema is the allowlist; see [Strong Parameters](#strong-parameters)).
+
+### Scoping input: `from:` and `strict:`
+
+By default the reader parses all of `params`. Two options narrow or tighten that:
+
+- **`from:`** scopes the source. A **Symbol** names a params key (`from: :q` → `params[:q]`) for the common nested case; a **proc**, evaluated in controller context, handles anything a single key can't (`from: -> { params.dig(:data, :attributes) }`).
+- **`strict:`** — `accepts CreateEmployee, strict: true` rejects loose input at this endpoint (overriding `Accord.config.strict`); a bad or missing value renders a `422` like any other client data. See [Strict mode](#strict-mode) for what "strict" changes.
+
+### Inline schemas
+
+Pass a block instead of a schema class to define the schema right on the action — handy for a simple, single-use input that doesn't warrant its own file:
+
+```ruby
+accepts from: :q do
+  string  :name
+  boolean :active
+end
+def index
+  render json: Employee.where(input.to_h)
+end
+```
+
+The inline schema is named from the action (`index` → `EmployeesController::IndexInput`, a versioned `create` → `CreateV2Input`), so it still projects to OpenAPI/RBS/RBI. Pass `const:` to choose the name (`accepts const: :SearchParams do … end`); Accord refuses to clobber an existing constant that isn't itself a schema. Reach for a top-level named class when you want reuse across controllers or isolated schema tests.
+
+### List inputs
+
+Wrap the schema in a one-element array to parse a **list** — the reader returns the parsed elements, and errors carry each element's index (`[2, :salary]`, no wrapper key):
+
+```ruby
+accepts [CreateEmployee], from: :employees, as: :batch   # params[:employees] is an array
+
+def import
+  Employee.insert_all!(batch.map(&:to_h))                # one 422 lists every bad row
+end
+```
+
+Like an inline block, this mints a constant — an `Accord::Schema::List` (`BatchInput`) whose projection methods are array-shaped: `.openapi` → `{ type: array, items: $ref }`, `.rbs` → `Array[CreateEmployee]`, `.graphql` → `[CreateEmployeeInput!]!`. Because it's a list wrapper (not a `Schema` subclass), it isn't a standalone named type — `tapioca dsl` and `accord:rbs` emit the *element* (`CreateEmployee`), and you reference the list type inline.
+
+### Partial updates (PATCH)
+
+Accord distinguishes an **absent** field from one sent as **explicit null**, which is exactly the PATCH contract — an absent field is left untouched, a null clears it. An explicit null yields `nil` (skipping any default); `to_h(compact: true)` returns only the fields the request actually carried a key for (keeping nulls, dropping absent):
+
+```ruby
+accepts CreateEmployee, as: :employee
+returns 204 => nil, 422 => :errors
+def update
+  # PATCH /employees/1  { "email": null }   -> clears email, leaves everything else alone
+  Employee.find(params[:id]).update!(employee.to_h(compact: true))
+  head :no_content
+end
+```
+
+Use `input.present?(:field)` to test whether a key was supplied. (Plain `to_h` is the create shape — every field, defaults applied.)
+
+### The response contract: `returns`
+
+`returns` maps `status => contract`, where a contract is one of:
+
+- a **`Schema`** — the response body, used in the dump direction (`201 => EmployeeView`)
+- a **`[Schema]`** list — a JSON array of that schema (`200 => [EmployeeView]`)
+- **`:errors`** — the shared structured-error response (`422 => :errors`), the same shape [`render_accord_errors`](#rendering-errors) emits
+- **`nil`** — no body (`204 => nil`)
+
+Responses are ordinary `Accord::Schema`s used in the dump direction — no separate serializer concept. There's no `Schema.dump!` class method: to project a record through a response schema, coerce it to canonical external form with `EmployeeView.parse!(record.attributes).dump` — parse the record's attributes into a typed instance, then `#dump` it. For a one-off response shape easier to declare inline than to name, `returns` also takes a block form — an anonymous response schema, named from the action like an inline `accepts`: `returns(201) { string :location }`.
+
+On `returns`, `version:` is a reserved key inside the responses hash (statuses are Integers, so it can't collide) — see [Versioning](#versioning).
+
+### OpenAPI generation
+
+Every contract feeds OpenAPI path generation. Eager-load, then ask for the document:
+
+```ruby
+Rails.application.eager_load!
+doc = Accord::ControllerHelpers.openapi_document(info: { title: "API", version: "v1" })
+File.write("openapi.json", JSON.pretty_generate(doc))
+```
+
+`doc` has full `paths` (verb + path pulled from your routes), `components.schemas` (`CreateEmployee`, `EmployeeView`, …), and a shared `components.responses` `AccordErrors` referenced by every `422 => :errors`. `openapi_document` accepts `info:`, `version:` (scope to one API version), `endpoints:` (a specific set instead of the whole app), and `resolver:` (override version resolution). See [openapi.md](openapi.md).
+
+### Introspection
+
+The whole contract graph is introspectable:
+
+- `Controller.accord_endpoints` — an Array of `Accord::Endpoint` for one controller.
+- `Accord::ControllerHelpers.endpoints` — every endpoint across the app.
+
+That's what the OpenAPI generator walks; you can walk it too, for docs, route audits, or contract tests.
 
 ### Versioning
 
@@ -209,8 +231,11 @@ returns 201 => EmployeeViewV1, version: 1
 accepts CreateEmployeeV2, version: 2
 returns 201 => EmployeeViewV2, 202 => AsyncReceipt, version: 2
 
-returns 422 => :errors                                          # unversioned → shared by every version
-def create = render json: view.dump!(...), status: :created     # `input` resolves the request's version
+returns 422 => :errors                              # unversioned → shared by every version
+def create
+  record = Employee.create!(input.to_h)             # `input` resolves the request's version
+  render json: record, status: :created
+end
 ```
 
 `version:` is a plain label — an Integer, or any value (`"2024-01"`, `"v2"`); Accord is unopinionated about its shape. Labels are matched exactly, as strings (`label.to_s == resolved.to_s`), so `1` matches `"1"` but `"V2"` won't match `"v2"` and `" 2"` won't match `"2"` — pick one canonical spelling and have your resolver emit it. On `accepts` `version:` is a keyword; on `returns` it's a reserved key inside the responses hash (statuses are Integers, so it can't collide). Suffix versioned schema classes (`CreateEmployeeV1`, not `V1::CreateEmployee`) — Accord follows the same convention for auto-named anonymous version blocks (`accepts version: 2 do … end` → `CreateV2Input`). An **unversioned** `returns` is shared into every version (handy for a common `422 => :errors`); an unversioned `accepts` alongside versioned ones is ambiguous and rejected.
@@ -229,6 +254,41 @@ end
 The reader parses the contract whose `version:` matches the resolved value, falling back to the unversioned one. With versioned contracts declared but **no resolver set, Accord raises `Accord::ConfigurationError`** — at boot via `Accord.freeze!` (call it after eager-load), and again at request time as a backstop — rather than silently serving the wrong schema. A resolved version that matches no contract also raises (your versioning layer should reject unsupported versions before dispatch). Inside an action, branch on your *versioning library's* accessor (e.g. `request.version`) — the same source the resolver reads — not on Accord internals.
 
 For header or media-type versioning, each version projects to its **own** OpenAPI document — `Accord::ControllerHelpers.openapi_document(info:, version: 2)` — because those versions share a `path + verb` and a header can't distinguish them in one operation; unversioned endpoints are included in every version's doc. URL-segment versioning (`/v1/…` vs `/v2/…`) has distinct paths, so it can emit a single combined document (omit `version:`).
+
+---
+
+## The `accord` macro (lighter alternative)
+
+> Prefer [`accepts`/`returns`](#the-contract-dsl-accepts--returns) for new code — it gives the same typed reader plus a documented contract and OpenAPI. `accord` is the lighter option when you want *only* typed input and no contract; we're keeping it for now and will revisit its role after more real-world use.
+
+`accord :name, Schema` defines a **lazily-parsed, memoized reader** named `name`. It's not an action hook — it's just a reader — so a controller can declare several inputs and each action uses whichever it needs:
+
+```ruby
+class EmployeesController < ApplicationController
+  accord :employee, CreateEmployee
+  accord :filters,  EmployeeFilters, from: -> { params.fetch(:q, {}) }
+
+  def index
+    render json: Employee.where(filters.to_h)   # uses `filters`
+  end
+
+  def create
+    render json: Employee.create!(employee.to_h), status: :created  # uses `employee`
+  end
+end
+```
+
+`accord` shares the same declaration options as `accepts` — `from:` (Symbol or proc), `strict:`, an inline block schema (`accord :search, from: :q do … end`, named `SearchController::SearchInput`, `const:` to override), and list inputs (`accord :batch, [CreateEmployee], from: :employees`). The difference is scope: `accord` gives you named readers, full stop — no response contract, no OpenAPI path.
+
+- **Lazy** — the schema parses on first access, so declaring an input costs nothing in actions that don't use it. **Memoized** — accessing `employee` twice parses once.
+- **Typed** — with Sorbet, the bundled Tapioca DSL compiler types each reader from its schema (`employee` → `CreateEmployee`, a `[Schema]` list → `T::Array[CreateEmployee]`), so `employee.salary` type-checks inside the action. Run `bundle exec tapioca dsl`.
+- **Introspectable** — the declarations live in `Controller.accord_inputs` (`{ reader_name => schema }`), e.g. to enumerate every controller's inputs for docs.
+
+To fail before the action body (eager validation), name the reader in a `before_action`:
+
+```ruby
+before_action :employee, only: :create
+```
 
 ---
 
@@ -328,7 +388,7 @@ class EmployeeFilters < Accord::Schema
 end
 
 class EmployeesController < ApplicationController
-  accord :filters, EmployeeFilters, from: -> { params.fetch(:q, {}) }
+  accepts EmployeeFilters, as: :filters, from: -> { params.fetch(:q, {}) }
 
   def index
     scope = Employee.all
@@ -346,7 +406,7 @@ end
 
 ## Strong Parameters
 
-You don't need `permit`. **The schema is the allowlist**: it reads only its declared fields, via `[]`/`key?`, which `ActionController::Parameters` permits without permitting. Undeclared params are ignored, so an attacker can't set fields you didn't ask for.
+You don't need `permit`. **The schema is the allowlist**: it reads only its declared fields, via `[]`/`key?`, which `ActionController::Parameters` permits without permitting. Undeclared params are ignored — in permissive and strict mode alike, never an error — so an attacker can't set fields you didn't ask for.
 
 ```ruby
 # params: { name: "Ada", salary: "50000", admin: true }
@@ -473,3 +533,5 @@ You can also test schemas in isolation (no controller), which is faster and ofte
 ---
 
 See also: [getting_started.md](getting_started.md) · [types.md](types.md) · [validation.md](validation.md) · [errors.md](errors.md) · [typing.md](typing.md)
+</content>
+</invoke>
