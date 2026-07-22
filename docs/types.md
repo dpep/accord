@@ -15,6 +15,27 @@ Every type implements the same four methods:
 
 Inside a schema, permissive parsing collects a structured error instead of returning `nil`; strict parsing raises. See [Rails](rails.md#strict-mode) for how modes surface at the boundary.
 
+## Using a type on its own
+
+You don't need a schema to use a type — each one is a standalone coercer, handy for a single value in your own code (a query param, a config entry, a CSV cell). For a type with no configuration, call the methods right on the class (they delegate to a default-config instance):
+
+```ruby
+Accord::Types::UUID.parse("550E8400-E29B-41D4-A716-446655440000")  # => "550e8400-..."  (canonical)
+Accord::Types::UUID.parse("nope")                                  # => nil   (permissive: bad input logged)
+Accord::Types::Email.parse!("Ada@Example.com")                     # => "ada@example.com"  (or raises CoercionError)
+```
+
+For a **configured** type — a `Currency`'s `scale`, a `Date`'s `formats`, a `Phone`'s `country_code` — build an instance and reuse it across values:
+
+```ruby
+money = Accord::Types::Currency.new(scale: 2)
+money.parse("$1,234.50")           # => BigDecimal("1234.50")   (strips $ and commas)
+money.parse!("nonsense")           # => raises Accord::CoercionError
+money.dump(BigDecimal("1234.5"))   # => "1234.50"               (canonical external form)
+```
+
+Same `parse` / `parse!` / `dump` a schema calls per field — the only difference is that a schema collects a structured error where a bare type's permissive `parse` returns `nil`.
+
 ## The field DSL
 
 | DSL | Internal value | Notes |

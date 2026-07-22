@@ -7,7 +7,7 @@ API contracts for Ruby.
 
 > **accord** — *n.* a state of agreement, harmony, or a formal treaty between parties. *v.* to be consistent with something.
 
-One schema declaration is the source of truth for an API boundary: it parses untrusted input into canonical, typed Ruby values, validates it, collects structured errors, and projects itself into OpenAPI and RBS/RBI. Its home turf is the Rails controller — typed, validated request input, with no `permit` dance and no hand-written coercion.
+One schema declaration is the source of truth for an API boundary: it parses untrusted input into canonical, typed Ruby values, validates it, collects structured errors, and projects itself into OpenAPI and RBS/RBI. The core has **no framework dependency** — use it in any Ruby app — and the opt-in Rails integration makes it shine at the controller: typed, validated request input with no `permit` dance and no hand-written coercion.
 
 ```ruby
 class CreateEmployee < Accord::Schema
@@ -17,16 +17,16 @@ class CreateEmployee < Accord::Schema
 end
 
 class EmployeesController < ApplicationController
-  accord :employee, CreateEmployee
+  accepts CreateEmployee, as: :employee   # a typed request contract; 422 if invalid
 
   def create
-    EmployeeService.call(employee)   # parsed + memoized on first use; 422 if invalid
+    EmployeeService.call(employee)         # parsed + memoized on first use
     head :created
   end
 end
 ```
 
-The reader hands you coerced values directly — no wrappers, no strings to re-parse:
+Add `returns 201 => EmployeeView` and the request/response pair becomes a documented contract that generates your OpenAPI paths. The reader hands you coerced values directly — no wrappers, no strings to re-parse:
 
 ```ruby
 employee.name    # => "Ada"
@@ -48,7 +48,8 @@ input.errors.map(&:to_h)           # structured, render however you like
 - **Two parsing modes, one engine.** `parse` is permissive — it accepts legacy formats (`"$1,000.00"` → `BigDecimal`), normalizes, and collects one structured error per bad field instead of raising. `parse!` (or `strict:`) raises on the first bad value, for trusted callers. `dump` always emits the canonical external form.
 - **Declarative validation.** Rules live in field blocks (`length`, `between`, `inclusion`, `format`, …) or as positional flags (`string :name, :required`). Add your own inline or via a registry, usable by name in any schema.
 - **Structured errors, not strings.** Every `Accord::Error` is data — `path`, `code`, `field`, `validator`, `value`, `metadata` — so rendering (JSON, GraphQL) stays a separate concern. Nested schemas produce nested paths (`[:employees, 2, :salary]`) with no special handling. Ships localized messages and an `ActiveModel::Errors`-style renderer (`Accord::Messages`) for when you do want text.
-- **Rails integration, opt-in.** The core gem carries no Rails dependency. Require `accord/rails` and a Railtie adds the `accord` controller macro, 422 rendering, and permissive-parse events over `ActiveSupport::Notifications`.
+- **Framework-agnostic core.** No Rails or ActiveSupport dependency — a schema is plain Ruby with `parse`/`parse!`, and each type is a standalone coercer (`Accord::Types::Currency.new.parse("$1,234.50")`). Drop it into Sinatra, a Rack app, a background job, a service object, or a script.
+- **Rails integration, opt-in.** Require `accord/rails` and a Railtie adds the `accepts`/`returns` contract decorators (typed request input, response contracts, OpenAPI paths) — plus the lighter `accord` reader macro — 422 rendering, and permissive-parse events over `ActiveSupport::Notifications`.
 - **Typing projections.** `Schema.rbs` and `Schema.rbi` generate typed reader signatures; a bundled Tapioca DSL compiler auto-generates RBI under `tapioca dsl`. Steep consumes the RBS, Sorbet the RBI — no manual conversion.
 - **OpenAPI.** `Schema.openapi` generates an object schema — properties, `required`, and validator-derived constraints (`between 0..100` → `minimum`/`maximum`, `inclusion [...]` → `enum`), nested schemas by `$ref`. `Accord.openapi_schemas(...)` builds the components map, ready to feed [rswag](docs/openapi.md#rswag).
 
