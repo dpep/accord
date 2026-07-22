@@ -1,10 +1,12 @@
 # Accord in Rails controllers
 
-Accord's sweet spot is the controller boundary: turn untrusted `params` into a **typed, validated input object** with one declaration, and let malformed requests become a `422` automatically. This guide covers the full flow — setup, the `accord` macro, error rendering, query params, testing, and observability.
+Accord's sweet spot is the controller boundary: turn untrusted `params` into a **typed, validated input object** with one declaration, and let malformed requests become a `422` automatically. The recommended path is the **`accepts`/`returns` contract DSL** — a documented per-action request/response contract that also drives OpenAPI. A lighter `accord` macro (typed readers, no contract) remains for simple cases, but new code should prefer `accepts`/`returns`. This guide covers the full flow — setup, contracts, error rendering, query params, testing, and observability.
 
 - [Setup](#setup)
 - [Your first controller](#your-first-controller)
-- [The `accord` macro](#the-accord-macro)
+- [The contract DSL: `accepts` / `returns`](#the-contract-dsl-accepts--returns)
+- [Versioning](#versioning)
+- [The `accord` macro (lighter alternative)](#the-accord-macro-lighter-alternative)
 - [Calling a schema directly](#calling-a-schema-directly)
 - [Rendering errors](#rendering-errors)
 - [Query params and filters](#query-params-and-filters)
@@ -44,11 +46,11 @@ end
 
 ## Your first controller
 
-Declare the input with `accord`, then use the memoized reader (`employee`) in your action:
+Declare the request contract with `accepts` (naming the reader with `as:`), then use the memoized reader (`employee`) in your action:
 
 ```ruby
 class EmployeesController < ApplicationController
-  accord :employee, CreateEmployee
+  accepts CreateEmployee, as: :employee
 
   def create
     record = Employee.create!(employee.to_h)
@@ -99,7 +101,9 @@ Note that **every** error is reported, not just the first — Accord parses the 
 
 ---
 
-## The `accord` macro
+## The `accord` macro (lighter alternative)
+
+> Prefer [`accepts`/`returns`](#the-contract-dsl-accepts--returns) for new code — it gives the same typed reader plus a documented contract and OpenAPI. `accord` is the lighter option when you want *only* typed input and no contract; we're keeping it for now and will revisit its role after more real-world use.
 
 ```ruby
 accord :employee, CreateEmployee
