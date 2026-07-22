@@ -37,6 +37,7 @@ module Accord
     def freeze!
       Types.freeze!
       Validators.freeze!
+      ControllerHelpers.validate_versioning! if defined?(ControllerHelpers)
       config.freeze
       self
     end

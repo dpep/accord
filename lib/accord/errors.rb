@@ -106,4 +106,10 @@ module Accord
       input.errors
     end
   end
+
+  # Raised for a misconfigured contract — a programmer/boot fault, not client
+  # input (so it surfaces as a 500, never a collectable 422). Distinct from the
+  # structured, client-facing Accord::Error. E.g. versioned contracts declared
+  # with no `version_resolver`, or a non-callable resolver.
+  class ConfigurationError < Fault; end
 end

@@ -138,7 +138,6 @@ module Accord
         raise ArgumentError, "accepts takes a schema or a block, not both" if block && schema
         raise ArgumentError, "accepts needs a schema or a block" if schema.nil? && block.nil?
 
-        cross_check_accord_version!(schema, version)
         accord_pending_slot(version)[:accepts] = { schema:, block:, from:, as:, strict: }
         nil
       end
@@ -286,21 +285,23 @@ module Accord
         "V#{version.to_s.gsub(/[^a-zA-Z0-9]/, "")}"
       end
 
-      # A versioned `accepts` whose schema name suffixes `V<n>` must agree with the
-      # declared `version:` — a copy-paste guard, caught at load, not inference.
-      def cross_check_accord_version!(schema, version)
-        return unless version.is_a?(Integer) && schema.respond_to?(:name) && schema.name
-
-        suffix = schema.name[/V(\d+)\z/, 1]
-        return if suffix.nil? || suffix.to_i == version
-
-        raise ArgumentError,
-              "accepts #{schema.name} is version #{suffix} by name but declares version: #{version}"
-      end
-
       def accord_camelize(name)
         name.to_s.split(/[^a-zA-Z0-9]+/).map(&:capitalize).join
       end
+    end
+
+    # Raise at boot if any controller declares versioned contracts but no
+    # `version_resolver` is configured — surfaces the misconfiguration before a
+    # request hits the request-time backstop. Called from `Accord.freeze!`;
+    # eager-load first for full coverage (an unloaded controller can't be seen).
+    def self.validate_versioning!(endpoints = self.endpoints)
+      return if Accord.config.version_resolver
+
+      offenders = endpoints.select(&:version).map(&:key).uniq
+      return if offenders.empty?
+
+      raise Accord::ConfigurationError,
+            "versioned contracts declared but Accord.config.version_resolver is unset: #{offenders.join(", ")}"
     end
 
     # Enumerate every controller's declared operations across the app (eager-load
@@ -358,7 +359,7 @@ module Accord
       candidates = self.class.accord_endpoints.select { |e| e.action == action && e.accepts? }
 
       if candidates.any?(&:version) && Accord.config.version_resolver.nil?
-        raise ArgumentError,
+        raise ConfigurationError,
               "#{self.class}##{action} declares versioned `accepts` contracts but Accord.config.version_resolver " \
               "is unset — set it to delegate to your API versioning library, e.g. " \
               "`->(controller) { controller.request.version }`"
@@ -366,7 +367,11 @@ module Accord
 
       version = accord_api_version
       endpoint = candidates.find { |e| e.version.to_s == version.to_s } || candidates.find { |e| e.version.nil? }
-      raise ArgumentError, "no accord `accepts` contract for #{action_name} (version #{version.inspect})" unless endpoint
+      unless endpoint
+        raise ConfigurationError,
+              "no `accepts` contract for #{self.class}##{action} at version #{version.inspect} — your versioning " \
+              "layer should reject unsupported versions before dispatch, or declare `accepts …, version: #{version.inspect}`"
+      end
 
       @accord_input_cache ||= {}
       @accord_input_cache[[action, version]] ||= endpoint.accepts.parse!(

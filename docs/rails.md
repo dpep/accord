@@ -209,7 +209,7 @@ returns 422 => :errors                                          # unversioned �
 def create = render json: view.dump!(...), status: :created     # `input` resolves the request's version
 ```
 
-`version:` is a plain label — an Integer, or any value (`"2024-01"`, `"v2"`). On `accepts` it's a keyword; on `returns` it's a reserved key inside the responses hash (statuses are Integers, so it can't collide). Suffix versioned schema classes (`CreateEmployeeV1`, not `V1::CreateEmployee`) — Accord follows the same convention for auto-named anonymous version blocks (`accepts version: 2 do … end` → `CreateV2Input`), and cross-checks a `V<n>`-suffixed name against the declared `version:` at load. An **unversioned** `returns` is shared into every version (handy for a common `422 => :errors`); an unversioned `accepts` alongside versioned ones is ambiguous and rejected.
+`version:` is a plain label — an Integer, or any value (`"2024-01"`, `"v2"`); Accord is unopinionated about its shape. Labels are matched exactly, as strings (`label.to_s == resolved.to_s`), so `1` matches `"1"` but `"V2"` won't match `"v2"` and `" 2"` won't match `"2"` — pick one canonical spelling and have your resolver emit it. On `accepts` `version:` is a keyword; on `returns` it's a reserved key inside the responses hash (statuses are Integers, so it can't collide). Suffix versioned schema classes (`CreateEmployeeV1`, not `V1::CreateEmployee`) — Accord follows the same convention for auto-named anonymous version blocks (`accepts version: 2 do … end` → `CreateV2Input`). An **unversioned** `returns` is shared into every version (handy for a common `422 => :errors`); an unversioned `accepts` alongside versioned ones is ambiguous and rejected.
 
 **Accord does not detect versions — it delegates.** Version negotiation (headers, URL segments, `Accept` media types, deprecation windows) is your API versioning library's job; Accord only maps the version *it already resolved* to a `version:` contract. Give it one hook — `Accord.config.version_resolver`, a `->(controller) { … }` returning the request's version — pointed at your library's source of truth:
 
@@ -222,9 +222,9 @@ Accord.configure do |c|
 end
 ```
 
-The reader parses the contract whose `version:` matches the resolved value (compared as strings), falling back to the unversioned one. With versioned contracts declared but **no resolver set, Accord raises** rather than silently serving the wrong schema. Inside an action, branch on your *versioning library's* accessor (e.g. `request.version`) — the same source the resolver reads — not on Accord internals.
+The reader parses the contract whose `version:` matches the resolved value, falling back to the unversioned one. With versioned contracts declared but **no resolver set, Accord raises `Accord::ConfigurationError`** — at boot via `Accord.freeze!` (call it after eager-load), and again at request time as a backstop — rather than silently serving the wrong schema. A resolved version that matches no contract also raises (your versioning layer should reject unsupported versions before dispatch). Inside an action, branch on your *versioning library's* accessor (e.g. `request.version`) — the same source the resolver reads — not on Accord internals.
 
-Each version projects to its **own** OpenAPI document — `Accord::ControllerHelpers.openapi_document(info:, version: 2)` — since a header can't vary a request body within one operation; unversioned endpoints are included in every version's doc.
+For header or media-type versioning, each version projects to its **own** OpenAPI document — `Accord::ControllerHelpers.openapi_document(info:, version: 2)` — because those versions share a `path + verb` and a header can't distinguish them in one operation; unversioned endpoints are included in every version's doc. URL-segment versioning (`/v1/…` vs `/v2/…`) has distinct paths, so it can emit a single combined document (omit `version:`).
 
 ---
 

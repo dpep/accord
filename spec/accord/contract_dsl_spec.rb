@@ -256,16 +256,6 @@ describe "accepts / returns contract DSL" do
       end.to raise_error(ArgumentError, /can't mix/)
     end
 
-    it "cross-checks a V-suffixed schema name against the declared version" do
-      stub_const("CreateEmployeeV2", Class.new(Accord::Schema) { string :name })
-      expect do
-        controller_class do
-          accepts CreateEmployeeV2, version: 1
-          def create = input
-        end
-      end.to raise_error(ArgumentError, /version/)
-    end
-
     it "accepts a non-integer version label (e.g. a date)" do
       controller = controller_class do
         accepts CreateV1, version: "2024-01"
@@ -279,7 +269,7 @@ describe "accepts / returns contract DSL" do
       Accord.config.version_resolver = nil
     end
 
-    it "fails fast when versioned contracts have no configured resolver" do
+    it "fails fast (ConfigurationError) when versioned contracts have no resolver" do
       controller = controller_class do
         accepts CreateV1, version: 1
         accepts CreateV2, version: 2
@@ -287,7 +277,29 @@ describe "accepts / returns contract DSL" do
       end
       instance = controller.new({ name: "Ada" }).tap { |c| c.action_name = "create" }
 
-      expect { instance.input }.to raise_error(ArgumentError, /version_resolver/)
+      expect { instance.input }.to raise_error(Accord::ConfigurationError, /version_resolver/)
+    end
+
+    it "validates versioning at boot via ControllerHelpers.validate_versioning!" do
+      controller = controller_class do
+        accepts CreateV1, version: 1
+        def create = input
+      end
+      stub_const("OrdersController", controller)
+      endpoints = Accord::ControllerHelpers.endpoints([controller])
+
+      expect { Accord::ControllerHelpers.validate_versioning!(endpoints) }
+        .to raise_error(Accord::ConfigurationError, /version_resolver/)
+
+      Accord.config.version_resolver = ->(_) { 1 }
+      expect { Accord::ControllerHelpers.validate_versioning!(endpoints) }.not_to raise_error
+    ensure
+      Accord.config.version_resolver = nil
+    end
+
+    it "rejects a non-callable version_resolver at config time" do
+      expect { Accord.config.version_resolver = "nope" }
+        .to raise_error(Accord::ConfigurationError, /callable/)
     end
 
     it "auto-names an anonymous versioned block schema with the version suffix" do

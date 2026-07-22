@@ -12,7 +12,17 @@ module Accord
   # the trusted-internal-caller mode.
   class Configuration
     attr_accessor :strict, :default_currency, :notifications, :observe_coercions, :input_reader,
-                  :default_phone_country_code, :version_resolver
+                  :default_phone_country_code
+    attr_reader :version_resolver
+
+    # Fail at config time (not mid-request) if the resolver isn't callable.
+    def version_resolver=(resolver)
+      unless resolver.nil? || resolver.respond_to?(:call)
+        raise ConfigurationError, "version_resolver must be callable (a proc/lambda taking the controller), got #{resolver.inspect}"
+      end
+
+      @version_resolver = resolver
+    end
 
     def initialize
       @strict = false
