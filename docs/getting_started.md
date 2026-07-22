@@ -73,6 +73,30 @@ CreateEmployee.openapi   # => an OpenAPI object schema (properties, required, va
 CreateEmployee.rbs       # => an RBS class with typed reader signatures
 ```
 
+## Use it anywhere (no Rails required)
+
+Everything above is plain Ruby — the core gem has **no Rails or ActiveSupport dependency**. A schema is just a class with `parse`/`parse!`, so it drops into any framework or context: a Sinatra/Roda/Hanami/Grape route, a Rack app, a Sidekiq job, a service object, a CLI. Hand `parse!` a Hash, get a typed object back or an `Accord::InvalidInput` carrying structured errors:
+
+```ruby
+def handle(params)
+  signup = Signup.parse!(params)            # typed object, or raises Accord::InvalidInput
+  [201, signup.dump]                        # canonical strings, ready to serialize
+rescue Accord::InvalidInput => e
+  [422, { errors: e.errors.map(&:to_h) }]   # structured errors, render however you like
+end
+```
+
+You can also use a single **type** directly, without a schema — one-off coercion and canonicalization:
+
+```ruby
+money = Accord::Types::Currency.new
+money.parse("$1,234.50")           # => BigDecimal("1234.50")   (permissive: nil if unparseable)
+money.parse!("nonsense")           # => raises Accord::CoercionError
+money.dump(BigDecimal("1234.5"))   # => "1234.50"               (canonical external form)
+```
+
+The Rails integration ([rails.md](rails.md)) is opt-in glue on top of this — nice, but never required. See [examples/standalone.rb](../examples/standalone.rb) for a runnable version and [types.md](types.md) for the full type interface.
+
 ## Next
 
 - **[Rails](rails.md)** — the main guide: controller macro, error rendering, filters, testing.
