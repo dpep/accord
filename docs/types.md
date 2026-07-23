@@ -30,11 +30,38 @@ For a **configured** type — a `Currency`'s `scale`, a `Date`'s `formats`, a `P
 ```ruby
 money = Accord::Types::Currency.new(scale: 2)
 money.parse("$1,234.50")           # => BigDecimal("1234.50")   (strips $ and commas)
-money.parse!("nonsense")           # => raises Accord::CoercionError
 money.dump(BigDecimal("1234.5"))   # => "1234.50"               (canonical external form)
 ```
 
-Same `parse` / `parse!` / `dump` a schema calls per field — the only difference is that a schema collects a structured error where a bare type's permissive `parse` returns `nil`.
+### On failure
+
+A bare type has **no `valid?` or `errors`** — those are schema features (a schema aggregates errors across fields). A single type reports failure two ways, one per parse mode:
+
+- **Permissive `parse`** returns `nil` and logs (via `Accord.logger`) — for "coerce it, or skip it."
+- **Strict `parse!`** raises `Accord::CoercionError`, which carries structured detail — `code` and `input` — so you can build your own error:
+
+```ruby
+money.parse("nonsense")            # => nil
+
+begin
+  money.parse!("nonsense")
+rescue Accord::CoercionError => e
+  e.code                           # => :invalid_currency
+  e.input                          # => "nonsense"
+end
+```
+
+When you want `valid?` / `errors` for a single value — the aggregated, collect-don't-raise behavior — reach for a schema; that's the layer that adds it. Wrap the one field:
+
+```ruby
+Amount = Class.new(Accord::Schema) { currency :amount, :positive }
+
+result = Amount.parse({ amount: "nope" })
+result.valid?                      # => false
+result.errors.map(&:to_h)          # => [{ path: [:amount], field: :amount, code: :invalid_currency, input: "nope" }]
+```
+
+So the rule of thumb: a **type** coerces one value (`nil` or `CoercionError` on failure); a **schema** coerces a set of fields and *collects* the failures as `errors`.
 
 ## The field DSL
 

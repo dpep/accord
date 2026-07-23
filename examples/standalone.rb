@@ -36,3 +36,11 @@ p handle({ "email" => "nope", "amount" => "-5" })
 money = Accord::Types::Currency.new
 p money.parse("$1,234.50")            # => 0.12345e4  (BigDecimal; permissive parse -> nil if unparseable)
 p money.dump(BigDecimal("1234.5"))    # => "1234.50"   (canonical external form)
+
+# A bare type has no valid?/errors (those are schema features). It fails via a
+# nil (permissive) or a structured CoercionError (strict):
+begin
+  money.parse!("nonsense")
+rescue Accord::CoercionError => e
+  p [e.code, e.input]                 # => [:invalid_currency, "nonsense"]
+end
