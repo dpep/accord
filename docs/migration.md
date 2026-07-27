@@ -91,6 +91,8 @@ end
 
 `Accord::Messages` mirrors `ActiveModel::Errors` (`messages`, `full_messages` — [errors.md](errors.md#i18n)), so most legacy shapes are reproducible. Exact message *text* may still differ from your model validations' — override the `accord.errors.<code>` locale keys where clients string-match (they shouldn't, but in a large app someone does).
 
+If existing views or helpers expect a real `ActiveModel::Errors` object (form builders, error partials, `full_messages`), `require "accord/active_model_errors"` and hand them `input.active_model_errors` — an `ActiveModel::Errors` populated from the parsed input, codes preserved in `details` ([errors.md](errors.md#activemodelerrors-rails-interop)).
+
 ### 4. Serializers — last, or never
 
 jbuilder/AMS/RABL render domain objects and are orthogonal to input parsing. The only serialization Accord owns is echoing the *input* back canonically (`input.dump` — [integrations.md](integrations.md#rabl)). Leave response migration out of scope; if you later want response contracts, that's a separate project.

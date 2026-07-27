@@ -94,6 +94,20 @@ es:
 
 Custom validator codes fall back to the code string until you add a locale entry for them.
 
+### ActiveModel::Errors (Rails interop)
+
+When you're slotting Accord into an existing Rails app, `Accord::ActiveModelErrors.build` adapts a parsed input's errors into a real `ActiveModel::Errors` object — so form helpers, error partials, and `full_messages` keep working unchanged. Opt-in (needs ActiveModel): `require "accord/active_model_errors"`.
+
+```ruby
+errors = input.active_model_errors        # or Accord::ActiveModelErrors.build(input)
+
+errors[:email]           # => ["is invalid"]              (localized Accord message)
+errors.full_messages     # => ["Email is invalid", ...]
+errors.details[:email]   # => [{ error: :invalid_email }] (Accord code stays machine-readable)
+```
+
+Each Accord error keeps its `code` as the ActiveModel error type (so `details` stays structured), carries the localized message from the catalog above, and folds validator metadata into `details`. A top-level field maps to its own attribute (`:email`); a nested path flattens to a form-style key (`[:employees, 2, :salary]` → `:"employees[2].salary"`); a root-level error is `:base`.
+
 ### Logs / metrics
 
 Structured errors are log- and metric-friendly as-is (`e.to_h`), and permissive parses also emit them as events — see [Observability](#observability).

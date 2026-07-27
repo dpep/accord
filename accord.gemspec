@@ -14,6 +14,7 @@ Gem::Specification.new do |s|
 
   s.add_dependency "bigdecimal"
 
+  s.add_development_dependency "activemodel"
   s.add_development_dependency "activesupport"
   s.add_development_dependency "debug"
   s.add_development_dependency "money"
