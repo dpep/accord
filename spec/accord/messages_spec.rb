@@ -51,4 +51,22 @@ describe Accord::Messages do
         .to contain_exactly("Name is required", "Hire count must be at least 18")
     end
   end
+
+  # Guards against a semantic type shipping without a localized message (it would
+  # silently render the raw code). Extend when adding a type with a new code.
+  describe "built-in coercion codes are all localized" do
+    codes = %i[
+      invalid_currency invalid_decimal invalid_integer invalid_date invalid_datetime
+      invalid_boolean invalid_duration invalid_percentage invalid_uuid invalid_email
+      invalid_url invalid_ip_address invalid_phone invalid_postal_code invalid_zip_code
+      invalid_ssn invalid_ein invalid_routing_number invalid_iban invalid_isocurrency
+      invalid_scale invalid_object invalid_array
+    ]
+
+    codes.each do |code|
+      it "has a message for #{code} (not the raw code)" do
+        expect(described_class.message(Accord::Error.new(path: [:x], code:))).not_to eq(code.to_s)
+      end
+    end
+  end
 end

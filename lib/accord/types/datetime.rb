@@ -46,6 +46,10 @@ module Accord
         ::Time
       end
 
+      # Match the `datetime` DSL name (the class-derived default would be
+      # `date_time`), so the error code is `invalid_datetime`.
+      def type_name = :datetime
+
       private
 
       def coerce(value, strict:)

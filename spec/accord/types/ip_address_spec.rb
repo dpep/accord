@@ -15,7 +15,7 @@ describe Accord::Types::IPAddress do
 
   describe "rejected inputs" do
     it "raises in strict mode for an invalid address" do
-      expect { type.parse!("999.1.1.1") }.to raise_error(Accord::CoercionError)
+      expect { type.parse!("999.1.1.1") }.to raise_error(Accord::CoercionError) { |e| expect(e.code).to eq(:invalid_ip_address) }
     end
 
     it "returns nil in permissive mode for garbage" do

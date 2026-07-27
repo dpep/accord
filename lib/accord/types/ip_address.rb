@@ -15,6 +15,10 @@ module Accord
         { type: "string", format: "ip" }
       end
 
+      # Match the `ip_address` DSL name (the class-derived default would be
+      # `ipaddress`), so the error code is `invalid_ip_address`.
+      def type_name = :ip_address
+
       private
 
       def canonicalize(string, strict:)

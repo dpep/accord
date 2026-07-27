@@ -36,7 +36,7 @@ describe Accord::Types::DateTime do
 
   describe "rejected inputs" do
     it "raises in strict mode for garbage" do
-      expect { type.parse!("not a time") }.to raise_error(Accord::CoercionError)
+      expect { type.parse!("not a time") }.to raise_error(Accord::CoercionError) { |e| expect(e.code).to eq(:invalid_datetime) }
     end
 
     it "returns nil in permissive mode for garbage" do
