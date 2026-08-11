@@ -15,6 +15,16 @@ describe Accord::Types::SSN do
       expect(type.parse("12345")).to be_nil
     end
 
+    it "rejects a masked SSN rather than reading the digits it leaves" do
+      expect(type.parse("XXX-XX-6789")).to be_nil
+      expect(type.parse("***-**-6789")).to be_nil
+      expect(type.parse("123-45-XXXX")).to be_nil
+    end
+
+    it "rejects digits buried in other characters" do
+      expect(type.parse("abc123def45ghi6789")).to be_nil
+    end
+
     it "rejects structurally-invalid numbers" do
       expect(type.parse("000-45-6789")).to be_nil   # area 000
       expect(type.parse("666-45-6789")).to be_nil   # area 666

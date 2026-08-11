@@ -117,6 +117,15 @@ Accord::Types::Currency.new(scale: 4).dump(BigDecimal("1.5"))  # => "1.5000"
 
 Inside a schema you rarely call this directly — projections (`dump`, `openapi`) use it for you.
 
+### Masked values are not numbers
+
+The digit-carrying types (`ssn`, `ein`, `routing_number`, `phone`) strip *separators* — hyphens, spaces, and for phone the `().+` people type — and nothing else. That matters because systems mask these fields on the way out (`XXX-XX-6789`, `***-**-6789`, `*****0021`) and that output comes back as input. A type that merely kept the digits would read a mask as a shorter number, or read `abc123def45ghi6789` as a valid SSN. Masked input is rejected like any other malformed value:
+
+```ruby
+Accord::Types::SSN.parse("XXX-XX-6789")   # => nil  (invalid_ssn, not "6789")
+Accord::Types::SSN.parse("123 45 6789")   # => "123-45-6789"
+```
+
 ## Decimals: scale and rounding
 
 `decimal`, `currency`, `duration`, and `percentage` are all `BigDecimal` internally — **never `Float`** (Floats are rejected in strict mode and routed through their string form otherwise, so binary rounding never enters the pipeline).

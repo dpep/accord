@@ -1,18 +1,21 @@
 # frozen_string_literal: true
 
 require_relative "string"
+require_relative "digit_string"
 
 module Accord
   module Types
     # A US bank routing number (ABA transit number): nine digits validated by the
-    # ABA check-digit algorithm, not just length. Strips any formatting to the
-    # canonical nine digits.
+    # ABA check-digit algorithm, not just length. Strips separators to the
+    # canonical nine digits; a masked `*****0021` is rejected, not salvaged.
     #
     #   routing_number :aba
     #
-    # US-only. The international equivalent — IBAN + BIC/SWIFT — is a different
-    # scheme entirely (a separate future type), not a variant of this.
+    # US-only. The international equivalent is a different scheme entirely —
+    # `iban` for the account, `bic` for the institution — not a variant of this.
     class RoutingNumber < String
+      include DigitString
+
       def openapi
         { type: "string", format: "aba-routing-number", example: "021000021" }
       end
@@ -20,8 +23,8 @@ module Accord
       private
 
       def canonicalize(string, strict:)
-        digits = string.gsub(/\D/, "")
-        invalid!(string) unless digits.length == 9 && aba_checksum_valid?(digits)
+        digits = digits_only(string)
+        invalid!(string) unless digits&.length == 9 && aba_checksum_valid?(digits)
 
         digits
       end

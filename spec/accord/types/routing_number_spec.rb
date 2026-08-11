@@ -23,6 +23,11 @@ describe Accord::Types::RoutingNumber do
       expect(type.parse("12345")).to be_nil
       expect { type.parse!("nope") }.to raise_error(Accord::CoercionError)
     end
+
+    it "rejects a masked account number" do
+      expect(type.parse("*****0021")).to be_nil
+      expect(type.parse("XXXXX0021")).to be_nil
+    end
   end
 
   describe "#openapi" do

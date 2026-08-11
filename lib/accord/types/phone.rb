@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "string"
+require_relative "digit_string"
 
 module Accord
   module Types
@@ -8,7 +9,8 @@ module Accord
     # (`+15551234567`). Accepts the common written forms — `(555) 123-4567`,
     # `555-123-4567`, `555.123.4567`, `+1 555 123 4567`, `1-555-123-4567`, and
     # raw `5551234567` — by stripping formatting to digits, then validating a
-    # 10-digit national number (optionally prefixed by the country code).
+    # 10-digit national number (optionally prefixed by the country code). Only
+    # separators are stripped, so a masked `(555) ***-4567` is rejected.
     #
     #   phone :mobile
     #   phone :mobile, country_code: "44"   # override the default calling code
@@ -18,6 +20,12 @@ module Accord
     # deliberately not libphonenumber — it validates NANP length + shape, not
     # every national numbering plan.
     class Phone < String
+      include DigitString
+
+      # The punctuation people write phone numbers with: `(555) 123-4567`,
+      # `555.123.4567`, `+1 555 123 4567`.
+      SEPARATORS = /[\s().+-]/
+
       def initialize(country_code: nil)
         @country_code = (country_code || Accord.config.default_phone_country_code).to_s.sub(/\A\+/, "")
       end
@@ -31,7 +39,7 @@ module Accord
       private
 
       def canonicalize(string, strict:)
-        digits = string.gsub(/\D/, "")
+        digits = digits_only(string, separators: SEPARATORS) or invalid!(string)
         national =
           if digits.length == 10
             digits

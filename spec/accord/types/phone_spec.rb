@@ -31,6 +31,11 @@ describe Accord::Types::Phone do
       expect(type.parse("555123456789")).to be_nil
       expect { type.parse!("nope") }.to raise_error(Accord::CoercionError)
     end
+
+    it "rejects a masked number" do
+      expect(type.parse("(555) ***-4567")).to be_nil
+      expect(type.parse("555-123-XXXX")).to be_nil
+    end
   end
 
   describe "#openapi" do
