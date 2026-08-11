@@ -20,6 +20,10 @@ module Accord
         { type: "string", format: "ein", example: "12-3456789" }
       end
 
+      def sensitive?
+        true
+      end
+
       private
 
       def canonicalize(string, strict:)

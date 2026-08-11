@@ -12,6 +12,9 @@ module Accord
     def initialize(type:, **opts)
       super(**opts)
       @type = type
+      # An undeclared `sensitive:` inherits the type's own answer, resolved once
+      # at declaration rather than re-asked per error.
+      @sensitive = type.sensitive? if @sensitive.nil?
     end
 
     # Reject a validator that can't run against this field's type at declaration
@@ -84,7 +87,10 @@ module Accord
       observe_permissive_coercion(raw, value, path) if !strict && Accord.observe_coercions?
       Result.ok(value)
     rescue CoercionError => e
-      raise if strict
+      # Strict propagates to the caller — but the exception carries the rejected
+      # input, and an error tracker will happily record it, so a sensitive field
+      # re-raises without the value.
+      raise(sensitive? ? CoercionError.new(code: e.code, input: REDACTED) : e) if strict
 
       Result.failed(error(path, e.code, input: e.input))
     end
@@ -96,7 +102,8 @@ module Accord
     def observe_permissive_coercion(raw, value, path)
       type.cast(raw, strict: true)
     rescue CoercionError
-      Accord.notify_coerced(field: name, path: path + [name], input: raw, value:, type: type.type_name)
+      Accord.notify_coerced(field: name, path: path + [name], input: redact(raw), value: redact(value),
+                            type: type.type_name)
     end
   end
 end

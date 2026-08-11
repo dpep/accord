@@ -31,7 +31,7 @@ module Accord
   class Schema
     # Keyword options consumed by the field itself; every other keyword on a
     # scalar DSL call is forwarded to the type's constructor.
-    FIELD_OPTIONS = %i[required default description example].freeze
+    FIELD_OPTIONS = %i[required default description example sensitive].freeze
 
     class << self
       def fields
@@ -313,6 +313,20 @@ module Accord
 
     def [](name)
       @values[name]
+    end
+
+    # Redacts sensitive fields. The default Object#inspect dumps @values, and a
+    # parsed schema lands in exception backtraces and debug logs — the one place
+    # a `sensitive:` declaration would otherwise be silently undone. Readers
+    # (#[], #to_h, #dump) still return the real value; this is about what gets
+    # printed, not what gets parsed.
+    def inspect
+      pairs = self.class.fields.filter_map do |name, field|
+        next unless @values.key?(name)
+
+        "#{name}=#{field.sensitive? ? REDACTED : @values[name].inspect}"
+      end
+      "#<#{self.class.name || "Accord::Schema"} #{pairs.join(" ")}>"
     end
 
     # @api private — resolves every field (coerce → validate) and aggregates the

@@ -112,6 +112,40 @@ Each Accord error keeps its `code` as the ActiveModel error type (so `details` s
 
 Structured errors are log- and metric-friendly as-is (`e.to_h`), and permissive parses also emit them as events — see [Observability](#observability).
 
+## Sensitive fields
+
+`value` and `input` are the useful part of an error and the dangerous part: they're the actual submitted data, and they flow straight into your logs, your error tracker, and your metrics pipeline. A rejected SSN is still an SSN.
+
+Mark the field and Accord reports `"[REDACTED]"` (`Accord::REDACTED`) in its place:
+
+```ruby
+class Application < Accord::Schema
+  ssn    :taxpayer_id                      # sensitive by default — the type says so
+  ein    :employer_id, sensitive: false    # opt out
+  string :api_key, sensitive: true         # opt in for any type
+end
+
+Application.parse({ taxpayer_id: "666-45-6789" }).errors.first.to_h
+# => { path: [:taxpayer_id], field: :taxpayer_id, code: :invalid_ssn, input: "[REDACTED]" }
+```
+
+`ssn`, `ein`, and `iban` are sensitive by default; a type declares this by overriding `#sensitive?`, so your own custom types can too. (`routing_number` and `bic` identify a *bank*, which is public information, so they aren't.)
+
+The flag covers every path by which Accord itself would surface the value:
+
+| Path | Behavior |
+|---|---|
+| `Accord::Error#input` / `#value` | `"[REDACTED]"` |
+| `accord.parse.<code>` notifications | `"[REDACTED]"` in the payload |
+| `accord.parse.coerced` notifications | `"[REDACTED]"` for both `input` and `value` |
+| `CoercionError#input` (strict mode) | `"[REDACTED]"` — the exception reaches your error tracker |
+| `Type#parse` standalone log line | `"[REDACTED]"` |
+| `Schema#inspect` | `taxpayer_id=[REDACTED]` |
+
+Redaction happens at construction, so the real value never enters an error object or an event payload — there's nothing to leak downstream.
+
+What it does **not** do: `input.taxpayer_id`, `#to_h`, and `#dump` all return the real value. That's the point — you still need the data. Validator metadata (`min:`, `expected:`, `pattern:`) also stays, since a rule isn't a secret. And the flag doesn't cascade into a nested `object`/`array` — declare it on the fields inside that schema, where they're defined.
+
 ## Code reference
 
 **Coercion codes** (a value couldn't become the canonical type):

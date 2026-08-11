@@ -20,6 +20,10 @@ module Accord
         { type: "string", format: "ssn", example: "123-45-6789" }
       end
 
+      def sensitive?
+        true
+      end
+
       private
 
       def canonicalize(string, strict:)

@@ -21,12 +21,13 @@ module Accord
 
     attr_reader :name, :default, :description, :example, :validators
 
-    def initialize(name:, required: false, default: nil, description: nil, example: nil)
+    def initialize(name:, required: false, default: nil, description: nil, example: nil, sensitive: nil)
       @name = name
       @name_string = name.to_s   # for string-keyed input lookups, computed once
       @default = default
       @description = description
       @example = example
+      @sensitive = sensitive
       @has_default = !default.nil?
       @validators = []
       @validators << Validators::Required.new if required
@@ -39,6 +40,15 @@ module Accord
 
     def has_default?
       @has_default
+    end
+
+    # A sensitive field's value never appears in an error, a notification, or a
+    # log line — the parsed value is still readable off the schema, but Accord
+    # won't be the thing that copies an SSN into your log aggregator. Declared
+    # per field (`string :api_key, sensitive: true`), defaulting to whatever the
+    # field's type says (ScalarField resolves that at declaration).
+    def sensitive?
+      @sensitive == true
     end
 
     def add_validator(validator)
@@ -220,6 +230,7 @@ module Accord
     def validation_error(path, validator, value, violation)
       code = violation[:code]
       full_path = path + [name]
+      value = redact(value)
       Accord.notify(code, path: full_path, field: name, validator: validator.name, value:)
       Error.new(path: full_path, field: name, code:, validator: validator.name, value:, **violation[:metadata])
     end
@@ -230,10 +241,22 @@ module Accord
     end
 
     # Create a structured error and emit its permissive-parse event. Only ever
-    # reached in non-strict mode (strict paths raise before collecting).
+    # reached in non-strict mode (strict paths raise before collecting). Every
+    # error carrying a raw value routes through here, so redacting here covers
+    # the collected error and the notification in one place.
     def build_error(path:, code:, input: nil)
+      input = redact(input)
       Accord.notify(code, field: name, path:, input:)
       Error.new(field: name, path:, code:, input:)
+    end
+
+    # The reportable stand-in for a value: itself, unless this field is
+    # sensitive. nil passes through so an absent value stays absent rather than
+    # reporting a redacted one that was never there.
+    def redact(value)
+      return value if value.nil? || !sensitive?
+
+      REDACTED
     end
 
     # Parse a raw value through a sub-schema at the given (already-built) path.

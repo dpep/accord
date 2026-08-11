@@ -126,6 +126,8 @@ Accord::Types::SSN.parse("XXX-XX-6789")   # => nil  (invalid_ssn, not "6789")
 Accord::Types::SSN.parse("123 45 6789")   # => "123-45-6789"
 ```
 
+Relatedly: `ssn`, `ein`, and `iban` are **sensitive by default**, so their values are withheld from errors, notifications, and logs. Any field can opt in or out with `sensitive:` — see [Sensitive fields](errors.md#sensitive-fields).
+
 ## Decimals: scale and rounding
 
 `decimal`, `currency`, `duration`, and `percentage` are all `BigDecimal` internally — **never `Float`** (Floats are rejected in strict mode and routed through their string form otherwise, so binary rounding never enters the pipeline).

@@ -6,6 +6,6 @@
 - nested schemas: object, array — composed error paths
 - permissive / strict parsing, canonical `dump`
 - declarative validation framework + validator registry
-- structured errors
+- structured errors, with `sensitive:` field redaction (ssn/ein/iban default on)
 - Rails integration (opt-in): `accord` controller macro, ActiveSupport notifications
 - typing projections: `Schema.rbs` / `Schema.rbi` + Tapioca DSL compiler

@@ -1,6 +1,12 @@
 # frozen_string_literal: true
 
 module Accord
+  # Stands in for a sensitive field's value wherever Accord would otherwise
+  # report it — in an error, a notification payload, or a log line. A visible
+  # placeholder rather than a dropped key, so a consumer can tell "withheld"
+  # from "there was no value".
+  REDACTED = "[REDACTED]"
+
   # A first-class, structured description of a single parse or validation
   # failure — data, never a rendered message. Rendering (Rails JSON, GraphQL,
   # i18n, logs) is a separate concern.

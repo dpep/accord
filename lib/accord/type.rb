@@ -53,8 +53,17 @@ module Accord
     def parse(value)
       cast(value, strict: false)
     rescue CoercionError => e
-      Accord.logger&.warn("accord: dropped invalid #{type_name} #{e.input.inspect}")
+      logged = sensitive? ? REDACTED : e.input.inspect
+      Accord.logger&.warn("accord: dropped invalid #{type_name} #{logged}")
       nil
+    end
+
+    # Whether values of this type are sensitive enough that Accord must never
+    # report them — a rejected SSN in a log is the leak the type exists to
+    # prevent. Fields inherit this and can override it per declaration
+    # (`ssn :taxpayer_id, sensitive: false`).
+    def sensitive?
+      false
     end
 
     def dump(value)

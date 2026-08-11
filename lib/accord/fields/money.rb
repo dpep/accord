@@ -184,9 +184,10 @@ module Accord
       raise CoercionError.new(code: :currency_mismatch, input: raw) if strict
 
       currency_path = path + [@currency.name]
-      Accord.notify(:currency_mismatch, field: @currency.name, path: currency_path, input: raw)
+      reported = redact(raw)
+      Accord.notify(:currency_mismatch, field: @currency.name, path: currency_path, input: reported)
       Result.failed(Error.new(path: currency_path, field: @currency.name, code: :currency_mismatch,
-                              input: raw, expected: @fixed_currency))
+                              input: reported, expected: @fixed_currency))
     end
 
     # The currency actually applied when input omits one: the field default, else

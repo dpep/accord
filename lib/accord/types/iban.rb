@@ -19,6 +19,12 @@ module Accord
         { type: "string", format: "iban", example: "GB82WEST12345698765432" }
       end
 
+      # An IBAN identifies one account. (A routing number or BIC identifies a
+      # bank — public information — so those aren't sensitive by default.)
+      def sensitive?
+        true
+      end
+
       private
 
       def canonicalize(string, strict:)
