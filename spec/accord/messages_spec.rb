@@ -59,7 +59,7 @@ describe Accord::Messages do
       invalid_currency invalid_decimal invalid_integer invalid_date invalid_datetime
       invalid_boolean invalid_duration invalid_percentage invalid_uuid invalid_email
       invalid_url invalid_ip_address invalid_phone invalid_postal_code invalid_zip_code
-      invalid_ssn invalid_ein invalid_routing_number invalid_iban invalid_isocurrency
+      invalid_ssn invalid_ein invalid_routing_number invalid_iban invalid_bic invalid_isocurrency
       invalid_scale invalid_object invalid_array
     ]
 

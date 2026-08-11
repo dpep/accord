@@ -68,6 +68,7 @@ So the rule of thumb: a **type** coerces one value (`nil` or `CoercionError` on 
 | DSL | Internal value | Notes |
 |---|---|---|
 | `array :items, LineItem` | `Array` of instances | nested schemas, indexed error paths |
+| `bic :bank` | `String` | BIC/SWIFT (ISO 9362); canonical uppercase, `XXX` branch dropped; `swift_code` is an alias |
 | `boolean :active` | `true`/`false` | permissive accepts `"true"`/`"1"`/`"yes"` etc. |
 | `currency :salary` | `BigDecimal` | `Decimal` with default `scale: 2`, strips `$`/`,` |
 | `date :on` | `Date` | ISO-8601 + configurable legacy `formats:` |
@@ -88,6 +89,7 @@ So the rule of thumb: a **type** coerces one value (`nil` or `CoercionError` on 
 | `routing_number :aba` | `String` | US ABA; 9 digits, **checksum-validated** |
 | `ssn :taxpayer_id` | `String` | US SSN; canonical `AAA-GG-SSSS`; rejects invalid ranges |
 | `string :name` | `String` | permissive also coerces Symbol/Numeric via `to_s` |
+| `swift_code :bank` | `String` | alias of `bic` |
 | `url :website` | `String` | absolute http(s); lowercases scheme + host |
 | `uuid :id` | `String` | canonical **lowercase** RFC 4122 (`550E8400-…` → `550e8400-…`) |
 | `zip_code :postal` | `String` | US ZIP / ZIP+4; canonical `12345` or `12345-6789` |

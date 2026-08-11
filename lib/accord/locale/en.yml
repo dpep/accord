@@ -37,6 +37,7 @@ en:
       invalid_ein: "is not a valid EIN"
       invalid_routing_number: "is not a valid routing number"
       invalid_iban: "is not a valid IBAN"
+      invalid_bic: "is not a valid BIC/SWIFT code"
       invalid_isocurrency: "is not a valid currency code"
       invalid_scale: "has too many decimal places"
       invalid_object: "must be an object"

@@ -13,6 +13,7 @@ require_relative "types/ssn"
 require_relative "types/ein"
 require_relative "types/routing_number"
 require_relative "types/iban"
+require_relative "types/bic"
 require_relative "types/iso_currency"
 require_relative "types/boolean"
 require_relative "types/integer"
@@ -37,6 +38,8 @@ module Accord
     register :ein, EIN
     register :routing_number, RoutingNumber
     register :iban, IBAN
+    register :bic, BIC
+    register :swift_code, BIC # the colloquial name for the same ISO 9362 code
     register :iso_currency, ISOCurrency
     register :boolean, Boolean
     register :integer, Integer
